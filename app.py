@@ -1,59 +1,16 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
-import os
 from datetime import datetime
+from supabase import create_client
 
 # -------------------------
-# BASE DE DATOS
+# SUPABASE
 # -------------------------
 
-DB_PATH = "backlog.db"
+url = "TU_URL_SUPABASE"
+key = "TU_ANON_KEY"
 
-if os.environ.get("RENDER"):
-    DB_PATH = "/data/backlog.db"
-
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-cursor = conn.cursor()
-
-def init_db():
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS desarrollos(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT,
-        celula TEXT,
-        horas_mes INTEGER,
-        horas_optimizadas INTEGER,
-        descripcion TEXT,
-        estado TEXT,
-        fecha TEXT,
-        puntos INTEGER,
-        analista TEXT,
-        categoria TEXT,
-        frecuencia TEXT,
-        sprint TEXT
-    )
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS desarrolladores(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT UNIQUE
-    )
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS desarrollo_dev(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        desarrollo_id INTEGER,
-        dev_id INTEGER
-    )
-    """)
-
-    conn.commit()
-
-init_db()
+supabase = create_client(url, key)
 
 # -------------------------
 # FUNCIONES DB
@@ -61,72 +18,83 @@ init_db()
 
 def obtener_desarrolladores():
 
-    df = pd.read_sql("SELECT * FROM desarrolladores", conn)
+    data = supabase.table("desarrolladores").select("*").execute()
 
-    return df
+    return pd.DataFrame(data.data)
 
 
 def agregar_desarrollador(nombre):
 
-    cursor.execute("INSERT INTO desarrolladores(nombre) VALUES(?)", (nombre,))
-    conn.commit()
+    supabase.table("desarrolladores").insert({"nombre": nombre}).execute()
 
 
 def eliminar_desarrollador(id):
 
-    cursor.execute("DELETE FROM desarrolladores WHERE id=?", (id,))
-    conn.commit()
+    supabase.table("desarrolladores").delete().eq("id", id).execute()
+
+
+def obtener_dev_id(nombre):
+
+    r = supabase.table("desarrolladores").select("id").eq("nombre", nombre).execute()
+
+    return r.data[0]["id"]
 
 
 def insertar_tarea(datos, devs):
 
-    cursor.execute("""
-    INSERT INTO desarrollos
-    (nombre,celula,horas_mes,horas_optimizadas,descripcion,estado,fecha,puntos,analista,categoria,frecuencia,sprint)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-    """, datos)
+    r = supabase.table("desarrollos").insert({
 
-    desarrollo_id = cursor.lastrowid
+        "nombre": datos[0],
+        "celula": datos[1],
+        "horas_mes": datos[2],
+        "horas_optimizadas": datos[3],
+        "descripcion": datos[4],
+        "estado": datos[5],
+        "fecha": datos[6],
+        "puntos": datos[7],
+        "analista": datos[8],
+        "categoria": datos[9],
+        "frecuencia": datos[10],
+        "sprint": datos[11]
+
+    }).execute()
+
+    desarrollo_id = r.data[0]["id"]
 
     for dev in devs:
 
         dev_id = obtener_dev_id(dev)
 
-        cursor.execute(
-            "INSERT INTO desarrollo_dev(desarrollo_id,dev_id) VALUES (?,?)",
-            (desarrollo_id, dev_id)
-        )
+        supabase.table("desarrollo_dev").insert({
 
-    conn.commit()
+            "desarrollo_id": desarrollo_id,
+            "dev_id": dev_id
 
-
-def obtener_dev_id(nombre):
-
-    cursor.execute(
-        "SELECT id FROM desarrolladores WHERE nombre=?",
-        (nombre,)
-    )
-
-    return cursor.fetchone()[0]
+        }).execute()
 
 
 def obtener_tareas():
 
-    df = pd.read_sql("SELECT * FROM desarrollos", conn)
+    tareas = supabase.table("desarrollos").select("*").execute()
+
+    df = pd.DataFrame(tareas.data)
 
     if df.empty:
         return df
 
-    devs = pd.read_sql("""
-    SELECT d.nombre,dd.desarrollo_id
-    FROM desarrolladores d
-    JOIN desarrollo_dev dd
-    ON d.id=dd.dev_id
-    """, conn)
+    rel = supabase.table("desarrollo_dev").select("*").execute()
+    rel = pd.DataFrame(rel.data)
 
-    devs = devs.groupby("desarrollo_id")["nombre"].apply(lambda x: ", ".join(x)).reset_index()
+    devs = supabase.table("desarrolladores").select("*").execute()
+    devs = pd.DataFrame(devs.data)
 
-    df = df.merge(devs, left_on="id", right_on="desarrollo_id", how="left")
+    rel = rel.merge(devs, left_on="dev_id", right_on="id")
+
+    rel = rel.groupby("desarrollo_id")["nombre"].apply(
+        lambda x: ", ".join(x)
+    ).reset_index()
+
+    df = df.merge(rel, left_on="id", right_on="desarrollo_id", how="left")
 
     df["horas_restantes"] = df["horas_mes"] - df["horas_optimizadas"]
 
@@ -135,29 +103,25 @@ def obtener_tareas():
 
 def finalizar_tarea(id, horas_opt, descripcion):
 
-    cursor.execute("""
-    UPDATE desarrollos
-    SET estado='Terminado',
-        horas_optimizadas=?,
-        descripcion=?
-    WHERE id=?
-    """, (horas_opt, descripcion, id))
+    supabase.table("desarrollos").update({
 
-    conn.commit()
+        "estado": "Terminado",
+        "horas_optimizadas": horas_opt,
+        "descripcion": descripcion
+
+    }).eq("id", id).execute()
+
 
 def eliminar_tarea(id):
 
-    cursor.execute(
-        "DELETE FROM desarrollo_dev WHERE desarrollo_id=?",
-        (id,)
-    )
+    supabase.table("desarrollo_dev").delete().eq(
+        "desarrollo_id", id
+    ).execute()
 
-    cursor.execute(
-        "DELETE FROM desarrollos WHERE id=?",
-        (id,)
-    )
+    supabase.table("desarrollos").delete().eq(
+        "id", id
+    ).execute()
 
-    conn.commit()
 
 # -------------------------
 # STREAMLIT
@@ -168,6 +132,7 @@ st.set_page_config(layout="wide")
 st.title("📊 Backlog Automatizaciones")
 
 menu = st.sidebar.selectbox(
+
     "Menu",
     [
         "Dashboard",
@@ -188,10 +153,12 @@ if menu == "Dashboard":
     df = obtener_tareas()
 
     if df.empty:
-        st.info("No hay tareas registradas")
+
+        st.info("No hay tareas")
+
     else:
 
-        col1,col2,col3 = st.columns(3)
+        col1, col2, col3 = st.columns(3)
 
         col1.metric("Tareas", len(df))
         col2.metric("Horas Mes", df["horas_mes"].sum())
@@ -199,16 +166,13 @@ if menu == "Dashboard":
 
         st.dataframe(df)
 
-
 # -------------------------
 # NUEVA TAREA
 # -------------------------
 
 if menu == "Nueva tarea":
 
-    st.header("Nueva tarea")
-
-    nombre = st.text_input("Nombre desarrollo")
+    nombre = st.text_input("Nombre")
 
     celula = st.text_input("Celula")
 
@@ -224,13 +188,17 @@ if menu == "Nueva tarea":
 
     sprint = st.text_input("Sprint")
 
-    devs = obtener_desarrolladores()["nombre"].tolist()
+    devs = obtener_desarrolladores()
 
-    devs_sel = st.multiselect("Desarrolladores", devs)
+    devs_sel = st.multiselect(
+        "Desarrolladores",
+        devs["nombre"].tolist()
+    )
 
     if st.button("Crear tarea"):
 
         datos = (
+
             nombre,
             celula,
             horas,
@@ -243,12 +211,12 @@ if menu == "Nueva tarea":
             categoria,
             frecuencia,
             sprint
+
         )
 
         insertar_tarea(datos, devs_sel)
 
         st.success("Tarea creada")
-
 
 # -------------------------
 # GESTION TAREAS
@@ -256,49 +224,27 @@ if menu == "Nueva tarea":
 
 if menu == "Gestion tareas":
 
-    st.header("Gestion de tareas")
-
     df = obtener_tareas()
 
-    if df.empty:
-        st.info("No hay tareas")
-    else:
+    st.dataframe(df)
 
-        st.dataframe(df)
+    id_tarea = st.number_input("ID tarea", 0)
 
-        id_tarea = st.number_input("ID tarea", 0)
+    horas_opt = st.number_input("Horas optimizadas", 0)
 
-        col1, col2 = st.columns(2)
+    desc = st.text_area("Descripcion")
 
-        # FINALIZAR
-        with col1:
+    if st.button("Finalizar tarea"):
 
-            st.subheader("Finalizar tarea")
+        finalizar_tarea(id_tarea, horas_opt, desc)
 
-            horas_opt = st.number_input("Horas optimizadas / mes", 0)
+        st.success("Tarea finalizada")
 
-            desc = st.text_area("Descripcion automatizacion")
+    if st.button("Eliminar tarea"):
 
-            if st.button("Finalizar tarea"):
+        eliminar_tarea(id_tarea)
 
-                finalizar_tarea(id_tarea, horas_opt, desc)
-
-                st.success("Tarea finalizada")
-
-                st.rerun()
-
-        # ELIMINAR
-        with col2:
-
-            st.subheader("Eliminar tarea")
-
-            if st.button("Eliminar tarea"):
-
-                eliminar_tarea(id_tarea)
-
-                st.warning("Tarea eliminada")
-
-                st.rerun()
+        st.warning("Tarea eliminada")
 
 # -------------------------
 # DESARROLLADORES
@@ -306,21 +252,19 @@ if menu == "Gestion tareas":
 
 if menu == "Desarrolladores":
 
-    st.header("Gestion desarrolladores")
-
     nombre = st.text_input("Nuevo desarrollador")
 
     if st.button("Agregar"):
 
         agregar_desarrollador(nombre)
 
-        st.success("Desarrollador agregado")
+        st.success("Agregado")
 
     df = obtener_desarrolladores()
 
     st.dataframe(df)
 
-    eliminar = st.number_input("ID eliminar")
+    eliminar = st.number_input("ID eliminar", 0)
 
     if st.button("Eliminar"):
 
@@ -328,17 +272,14 @@ if menu == "Desarrolladores":
 
         st.success("Eliminado")
 
-
 # -------------------------
 # IMPORTAR
 # -------------------------
 
 if menu == "Importar Excel":
 
-    st.header("Importar tareas")
-
     st.info("""
-Columnas requeridas:
+Columnas requeridas
 
 nombre
 celula
@@ -357,37 +298,28 @@ desarrolladores
 
         df = pd.read_excel(file)
 
-        df = df.fillna("")
-
         for _, r in df.iterrows():
 
-            try:
+            devs = [x.strip() for x in str(r["desarrolladores"]).split(",")]
 
-                horas_mes = int(r["horas_mes"]) if r["horas_mes"] != "" else 0
-                puntos = int(r["puntos"]) if r["puntos"] != "" else 0
+            datos = (
 
-                devs = [x.strip() for x in str(r["desarrolladores"]).split(",")]
+                r["nombre"],
+                r["celula"],
+                int(r["horas_mes"]),
+                0,
+                "",
+                "Backlog",
+                datetime.now().strftime("%Y-%m-%d"),
+                int(r["puntos"]),
+                r["analista"],
+                r["categoria"],
+                r["frecuencia"],
+                r["sprint"]
 
-                datos = (
-                    str(r["nombre"]),
-                    str(r["celula"]),
-                    horas_mes,
-                    0,
-                    "",
-                    "Backlog",
-                    datetime.now().strftime("%Y-%m-%d"),
-                    puntos,
-                    str(r["analista"]),
-                    str(r["categoria"]),
-                    str(r["frecuencia"]),
-                    str(r["sprint"])
-                )
+            )
 
-                insertar_tarea(datos, devs)
-
-            except Exception as e:
-
-                st.error(f"Error en fila {_}: {e}")
+            insertar_tarea(datos, devs)
 
         st.success("Importación completada")
 
@@ -401,14 +333,14 @@ if menu == "Exportar Excel":
 
     st.dataframe(df)
 
-    if st.button("Descargar Excel"):
+    if st.button("Descargar"):
 
-        df.to_excel("backlog_export.xlsx", index=False)
+        df.to_excel("backlog.xlsx", index=False)
 
-        with open("backlog_export.xlsx","rb") as f:
+        with open("backlog.xlsx", "rb") as f:
 
             st.download_button(
-                "Descargar",
+                "Descargar Excel",
                 f,
                 "backlog.xlsx"
             )
