@@ -6,6 +6,40 @@ import os
 import io
 import plotly.express as px
 
+def actualizar_tarea(datos, devs):
+
+    try:
+
+        supabase.table("desarrollos").update({
+
+            "nombre": datos[0],
+            "celula": datos[1],
+            "horas_mes": datos[2],
+            "horas_optimizadas": datos[3],
+            "descripcion_desarrollo": datos[4],
+            "prioridad": datos[5],
+            "puntos": datos[6],
+            "analista": datos[7],
+            "categoria": datos[8],
+            "frecuencia": datos[9],
+            "sprint": datos[10],
+            "fecha_inicio": datos[11],
+            "fecha_fin": datos[12]
+
+        }).eq("id", datos[13]).execute()
+
+        # actualizar desarrolladores
+        supabase.table("desarrollos").update({
+            "desarrolladores": ", ".join(devs)
+        }).eq("id", datos[13]).execute()
+
+        return True
+
+    except Exception as e:
+
+        st.error(f"Error actualizando tarea: {e}")
+        return False
+    
 #SEMAFORIZACION
 
 def mostrar_prioridad(valor):
@@ -818,99 +852,147 @@ elif menu == "📝 Gestión de Tareas":
                         st.error("❌ ID no encontrado")
 
 
-        # TAB 5: EDITAR TAREA COMPLETA
-        with tab5:
+        # TAB: EDITAR TAREA
+        st.subheader("✏️ Editar información de la tarea")
 
-            st.markdown("### ✏️ Editar Información de la Tarea")
+        id_editar = st.number_input(
+            "ID de la tarea",
+            min_value=1,
+            step=1,
+            key="editar_id"
+        )
 
-            id_editar = st.number_input(
-                "ID de la tarea",
-                min_value=1,
-                step=1,
-                key="id_editar"
-            )
+        tarea = df[df["id"] == id_editar]
 
-            tarea = df[df["id"] == id_editar]
+        if not tarea.empty:
 
-            if not tarea.empty:
+            tarea = tarea.iloc[0]
 
-                tarea = tarea.iloc[0]
+            with st.form("form_editar_tarea"):
 
                 col1, col2 = st.columns(2)
 
                 with col1:
 
-                    nuevo_nombre = st.text_input("Nombre", tarea["nombre"])
-
-                    nueva_prioridad = st.selectbox(
-                        "Prioridad",
-                        ["URGENTE","MEDIA","BAJA"],
-                        index=["URGENTE","MEDIA","BAJA"].index(tarea["prioridad"])
+                    nombre = st.text_input(
+                        "Nombre de la tarea",
+                        value=tarea["nombre"]
                     )
 
-                    nuevo_estado = st.selectbox(
-                        "Estado",
-                        ["Backlog","En progreso","Terminado"],
-                       index=["Backlog","En progreso","Terminado"].index(tarea["estado"])
-                     )
+                    descripcion = st.text_area(
+                        "Descripción del desarrollo",
+                        value=tarea.get("descripcion", "")
+                    )
 
-                    nueva_celula = st.text_input("Célula", tarea["celula"])
+                    prioridad = st.selectbox(
+                        "Prioridad",
+                        ["URGENTE", "MEDIA", "BAJA"],
+                        index=["URGENTE","MEDIA","BAJA"].index(
+                            str(tarea.get("prioridad","MEDIA")).upper()
+                        )
+                    )
 
-                    nuevo_sprint = st.text_input("Sprint", tarea["sprint"])
+                    celula = st.text_input(
+                        "Célula",
+                        value=tarea["celula"]
+                    )
+
+                    analista = st.text_input(
+                        "Analista",
+                        value=tarea["analista"]
+                    )
 
                 with col2:
 
-                    nuevas_horas = st.number_input(
-                        "Horas Mes",
-                        min_value=0,
+                    horas_mes = st.number_input(
+                        "Horas mensuales",
                         value=int(tarea["horas_mes"])
                     )
 
-                    nuevas_horas_opt = st.number_input(
-                        "Horas Optimizadas",
-                        min_value=0,
-                        value=int(tarea["horas_optimizadas"])
+                    horas_opt = st.number_input(
+                        "Horas optimizadas",
+                        value=int(tarea.get("horas_optimizadas",0))
                     )
 
-                    nuevos_puntos = st.number_input(
+                    puntos = st.number_input(
                         "Puntos",
-                        min_value=0,
                         value=int(tarea["puntos"])
                     )
 
-                    nuevo_analista = st.text_input("Analista", tarea["analista"])
+                    categoria = st.text_input(
+                        "Categoría",
+                        value=tarea["categoria"]
+                    )
 
-                nueva_categoria = st.text_input("Categoría", tarea["categoria"])
+                    frecuencia = st.text_input(
+                        "Frecuencia",
+                        value=tarea["frecuencia"]
+                    )
 
-                nueva_frecuencia = st.text_input("Frecuencia", tarea["frecuencia"])
+                col3, col4 = st.columns(2)
 
-                nueva_desc = st.text_area(
-                    "Descripción del Desarrollo",
-                    tarea.get("descripcion_desarrollo","")
-                )
+                with col3:
 
-                if st.button("💾 Guardar Cambios"):
+                    sprint = st.text_input(
+                        "Sprint",
+                        value=tarea["sprint"]
+                    )
 
-                    supabase.table("desarrollos").update({
+                with col4:
 
-                        "nombre": nuevo_nombre,
-                        "prioridad": nueva_prioridad,
-                        "estado": nuevo_estado,
-                        "celula": nueva_celula,
-                        "sprint": nuevo_sprint,
-                        "horas_mes": nuevas_horas,
-                        "horas_optimizadas": nuevas_horas_opt,
-                        "puntos": nuevos_puntos,
-                        "analista": nuevo_analista,
-                        "categoria": nueva_categoria,
-                        "frecuencia": nueva_frecuencia,
-                        "descripcion_desarrollo": nueva_desc
+                    desarrolladores = st.text_input(
+                        "Desarrolladores (separados por coma)",
+                        value=tarea["desarrolladores"]
+                    )
 
-                    }).eq("id", id_editar).execute()
+                col_fecha1, col_fecha2 = st.columns(2)
 
-                    st.success("✅ Tarea actualizada correctamente")
-                    st.rerun()
+                with col_fecha1:
 
+                    fecha_inicio = st.date_input(
+                        "Fecha inicio desarrollo",
+                        value=pd.to_datetime(tarea.get("fecha_inicio")).date()
+                        if tarea.get("fecha_inicio") else None
+                    )
+
+                with col_fecha2:
+
+                    fecha_fin = st.date_input(
+                        "Fecha fin desarrollo",
+                        value=pd.to_datetime(tarea.get("fecha_fin")).date()
+                        if tarea.get("fecha_fin") else None
+                    )
+
+                guardar = st.form_submit_button("💾 Guardar cambios")
+
+                if guardar:
+
+                    devs = [x.strip() for x in desarrolladores.split(",")]
+
+                    datos_actualizados = (
+                        nombre,
+                        celula,
+                        horas_mes,
+                        horas_opt,
+                        descripcion,
+                        prioridad,
+                        puntos,
+                        analista,
+                        categoria,
+                        frecuencia,
+                        sprint,
+                        fecha_inicio,
+                        fecha_fin,
+                        id_editar
+                    )
+
+                    if actualizar_tarea(datos_actualizados, devs):
+
+                        st.success("✅ Tarea actualizada correctamente")
+                        st.rerun()
+
+        else:
+            st.info("Ingresa un ID válido para editar")
 
         # TAB 6: Eliminar Tareas
         with tab6:
