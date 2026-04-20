@@ -726,11 +726,17 @@ elif menu == "📝 Gestión de Tareas":
                     key="id_prioridad"
                 )
 
+            # obtener prioridad actual de la tarea
+            tarea = df[df["id"] == id_prioridad]
+
+            if not tarea.empty:
+                prioridad_actual = str(tarea.iloc[0]["prioridad"]).upper()
+            else:
+                prioridad_actual = "MEDIA"
+
             with col_p2:
 
                 prioridades = ["URGENTE", "MEDIA", "BAJA"]
-
-                prioridad_actual = str(tarea.get("prioridad", "")).upper()
 
                 if prioridad_actual not in prioridades:
                     prioridad_actual = "MEDIA"
