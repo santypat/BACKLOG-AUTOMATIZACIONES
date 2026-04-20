@@ -4,6 +4,7 @@ from datetime import datetime
 from supabase import create_client
 import os
 import io
+import plotly.express as px
 
 #SEMAFORIZACION
 
@@ -202,8 +203,22 @@ def obtener_tareas():
         # Calcular horas restantes
         df["horas_restantes"] = df["horas_mes"] - df["horas_optimizadas"]
 
-        # Ordenar por ID descendente (más recientes primero)
-        df = df.sort_values("id", ascending=False)
+     
+        # Ordenar por prioridad (URGENTE → MEDIA → BAJA) y luego por ID
+        orden_prioridad = {
+            "URGENTE": 1,
+            "MEDIA": 2,
+            "BAJA": 3
+        }
+
+        df["orden_prioridad"] = df["prioridad"].map(orden_prioridad)
+
+        df = df.sort_values(
+            by=["orden_prioridad", "id"],
+            ascending=[True, False]
+        )
+
+        df = df.drop(columns=["orden_prioridad"])
 
         return df
 
@@ -411,20 +426,49 @@ if menu == "📊 Dashboard":
         
         st.divider()
         
-        # Gráficos
-        col_g1, col_g2 = st.columns(2)
-        
-        with col_g1:
-            st.subheader("📊 Distribución por Estado")
-            estado_counts = df['estado'].value_counts()
-            st.bar_chart(estado_counts)
-        
-        with col_g2:
-            st.subheader("🎯 Tareas por Sprint")
-            sprint_counts = df['sprint'].value_counts().head(10)
-            st.bar_chart(sprint_counts)
+        # -------------------------
+        # GRAFICO DE HORAS POR MES
+        # -------------------------
+
+        st.subheader("📊 Impacto de Automatizaciones por Mes")
+
+        df['fecha_creacion'] = pd.to_datetime(df['fecha_creacion'])
+        df['mes'] = df['fecha_creacion'].dt.to_period("M").astype(str)
+
+        df_mes = df.groupby("mes").agg({
+            "horas_mes": "sum",
+            "horas_optimizadas": "sum"
+        }).reset_index()
+
+        fig = px.bar(
+            df_mes,
+            x="mes",
+            y=["horas_mes", "horas_optimizadas"],
+            barmode="stack",
+            labels={
+                "value": "Horas",
+                "mes": "Mes",
+                "variable": "Tipo de Horas"
+            }
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
         
         st.divider()
+
+        # -------------------------
+        # PORCENTAJE DE OPTIMIZACIÓN
+        # -------------------------
+
+        if total_horas_mes > 0:
+            porcentaje_opt = (total_horas_opt / total_horas_mes) * 100
+        else:
+            porcentaje_opt = 0
+
+        st.metric(
+            "📈 Porcentaje de Horas Optimizadas",
+            f"{porcentaje_opt:.2f} %"
+        )
         
         # Tabla de impacto
         st.subheader("💡 Top 10 Automatizaciones por Impacto")
