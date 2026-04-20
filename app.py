@@ -411,7 +411,10 @@ if menu == "📊 Dashboard":
     if df.empty:
         st.info("📭 No hay tareas registradas. Crea una nueva tarea para comenzar.")
     else:
-        # Métricas principales
+        # -------------------------
+        # MÉTRICAS PRINCIPALES
+        # -------------------------
+
         col1, col2, col3, col4 = st.columns(4)
         
         total_tareas = len(df)
@@ -432,8 +435,9 @@ if menu == "📊 Dashboard":
 
         st.subheader("📊 Impacto de Automatizaciones por Mes")
 
-        df['fecha_creacion'] = pd.to_datetime(df['fecha_creacion'])
-        df['mes'] = df['fecha_creacion'].dt.to_period("M").astype(str)
+        df['fecha'] = pd.to_datetime(df['fecha'])
+
+        df['mes'] = df['fecha'].dt.to_period("M").astype(str)
 
         df_mes = df.groupby("mes").agg({
             "horas_mes": "sum",
@@ -449,7 +453,8 @@ if menu == "📊 Dashboard":
                 "value": "Horas",
                 "mes": "Mes",
                 "variable": "Tipo de Horas"
-            }
+            },
+            title="Horas Manuales vs Horas Optimizadas"
         )
 
         st.plotly_chart(fig, use_container_width=True)
@@ -460,26 +465,41 @@ if menu == "📊 Dashboard":
         # PORCENTAJE DE OPTIMIZACIÓN
         # -------------------------
 
-        if total_horas_mes > 0:
-            porcentaje_opt = (total_horas_opt / total_horas_mes) * 100
-        else:
-            porcentaje_opt = 0
+        porcentaje_opt = (total_horas_opt / total_horas_mes) * 100 if total_horas_mes > 0 else 0
 
         st.metric(
             "📈 Porcentaje de Horas Optimizadas",
-            f"{porcentaje_opt:.2f} %"
+            f"{porcentaje_opt:.2f}%"
         )
         
-        # Tabla de impacto
+        st.divider()
+
+        # -------------------------
+        # TOP AUTOMATIZACIONES
+        # -------------------------
+
         st.subheader("💡 Top 10 Automatizaciones por Impacto")
+
         df_terminadas = df[df['estado'] == 'Terminado'].copy()
         
         if not df_terminadas.empty:
-            df_terminadas = df_terminadas.nlargest(10, 'horas_restantes')[
-                ['nombre', 'desarrolladores', 'horas_mes', 'horas_optimizadas', 'horas_restantes', 'descripcion']
+
+            df_terminadas['ahorro'] = df_terminadas['horas_mes'] - df_terminadas['horas_optimizadas']
+
+            df_terminadas = df_terminadas.nlargest(10, 'ahorro')[
+                ['nombre', 'horas_mes', 'horas_optimizadas', 'ahorro', 'descripcion']
             ]
-            df_terminadas.columns = ['Desarrollo', 'Equipo', 'Horas Antes', 'Horas Después', 'Ahorro', 'Descripción']
+
+            df_terminadas.columns = [
+                'Desarrollo',
+                'Horas Antes',
+                'Horas Después',
+                'Ahorro',
+                'Descripción'
+            ]
+
             st.dataframe(df_terminadas, use_container_width=True, height=400)
+
         else:
             st.info("Aún no hay tareas terminadas con datos de optimización")
 
