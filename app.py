@@ -483,16 +483,38 @@ elif menu == "📝 Gestión de Tareas":
         
         # Preparar dataframe para mostrar
         df_display = df_filtrado[[
-            'id', 'nombre', 'desarrolladores', 'estado', 'sprint', 
-            'horas_mes', 'horas_optimizadas', 'horas_restantes', 
-            'categoria', 'celula', 'puntos', 'analista', 'fecha'
+            'id',
+            'Prioridad',
+            'nombre',
+            'desarrolladores',
+            'estado',
+            'sprint',
+            'horas_mes',
+            'horas_optimizadas',
+            'horas_restantes',
+            'categoria',
+            'celula',
+            'puntos',
+            'analista',
+            'fecha'
         ]].copy()
-        
+                
         # Renombrar columnas para mejor visualización
         df_display.columns = [
-            'ID', 'Nombre', 'Equipo', 'Estado', 'Sprint',
-            'Horas/Mes', 'Horas Opt.', 'Ahorro', 
-            'Categoría', 'Célula', 'Puntos', 'Analista', 'Fecha'
+                'ID',
+                'Prioridad',
+                'Nombre',
+                'Equipo',
+                'Estado',
+                'Sprint',
+                'Horas/Mes',
+                'Horas Opt.',
+                'Ahorro',
+                'Categoría',
+                'Célula',
+                'Puntos',
+                'Analista',
+                'Fecha'
         ]
         
         # Mostrar tabla con capacidad de selección
