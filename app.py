@@ -877,6 +877,22 @@ elif menu == "📝 Gestión de Tareas":
                 if prioridad_actual not in prioridades:
                     prioridad_actual = "MEDIA"
 
+                # -------- MANEJO SEGURO DE FECHAS --------
+
+                fecha_inicio_val = tarea.get("fecha_inicio")
+                if pd.isna(fecha_inicio_val):
+                    fecha_inicio_val = datetime.today()
+                else:
+                    fecha_inicio_val = pd.to_datetime(fecha_inicio_val)
+
+                fecha_fin_val = tarea.get("fecha_fin")
+                if pd.isna(fecha_fin_val):
+                    fecha_fin_val = datetime.today()
+                else:
+                    fecha_fin_val = pd.to_datetime(fecha_fin_val)
+
+                # -------- FORMULARIO --------
+
                 with st.form("form_editar_tarea"):
 
                     col1, col2 = st.columns(2)
@@ -902,13 +918,13 @@ elif menu == "📝 Gestión de Tareas":
                         horas_mes = st.number_input(
                             "Horas Mes",
                             min_value=0,
-                            value=int(tarea.get("horas_mes", 0))
+                            value=int(tarea.get("horas_mes") or 0)
                         )
 
                         puntos = st.number_input(
                             "Puntos",
                             min_value=0,
-                            value=int(tarea.get("puntos", 0))
+                            value=int(tarea.get("puntos") or 0)
                         )
 
                     with col2:
@@ -940,16 +956,12 @@ elif menu == "📝 Gestión de Tareas":
 
                     fecha_inicio = st.date_input(
                         "Fecha inicio desarrollo",
-                        value=pd.to_datetime(
-                            tarea.get("fecha_inicio", datetime.now())
-                        )
+                        value=fecha_inicio_val
                     )
 
                     fecha_fin = st.date_input(
                         "Fecha fin desarrollo",
-                        value=pd.to_datetime(
-                            tarea.get("fecha_fin", datetime.now())
-                        )
+                        value=fecha_fin_val
                     )
 
                     desarrolladores = st.text_input(
@@ -959,9 +971,11 @@ elif menu == "📝 Gestión de Tareas":
 
                     guardar = st.form_submit_button("💾 Guardar Cambios")
 
+                # -------- GUARDAR CAMBIOS --------
+
                 if guardar:
 
-                    devs = [x.strip() for x in desarrolladores.split(",")]
+                    devs = [x.strip() for x in desarrolladores.split(",") if x.strip()]
 
                     supabase.table("desarrollos").update({
 
@@ -986,6 +1000,7 @@ elif menu == "📝 Gestión de Tareas":
 
             else:
                 st.info("Introduce un ID válido para editar la tarea")
+                
 
         # TAB 6: Eliminar Tareas
         with tab6:
