@@ -992,8 +992,9 @@ elif menu == "📥 Importar Excel":
     
     with col_plant1:
         st.markdown("**Columnas requeridas:**")
-        st.code("""
+        st.code("""               
 nombre
+prioridad                
 celula
 horas_mes
 puntos
@@ -1019,6 +1020,7 @@ desarrolladores (separados por coma)
     
     st.divider()
     
+    
     # Importar archivo
     st.subheader("📤 Importar Tareas")
     
@@ -1031,12 +1033,23 @@ desarrolladores (separados por coma)
     if file:
         try:
             df_excel = pd.read_excel(file)
-            
-            # Validar columnas requeridas
+
+            # Normalizar nombres de columnas del Excel
+            df_excel.columns = df_excel.columns.str.lower().str.strip()
+
+            #COLUMNAS REQUERIDAS
             columnas_requeridas = [
-                'nombre', 'celula', 'horas_mes', 'puntos',
-                'analista', 'categoria', 'frecuencia', 'sprint', 'desarrolladores'
-            ]
+            'nombre',
+            'prioridad',
+            'celula',
+            'horas_mes',
+            'puntos',
+            'analista',
+            'categoria',
+            'frecuencia',
+            'sprint',
+            'desarrolladores'
+        ]
             
             columnas_faltantes = [col for col in columnas_requeridas if col not in df_excel.columns]
             
@@ -1061,11 +1074,12 @@ desarrolladores (separados por coma)
                             
                             datos = (
                                 r["nombre"],
+                                r["prioridad"],
                                 r["celula"],
                                 int(r["horas_mes"]),
-                                0,  # horas_optimizadas
-                                "",  # descripcion
-                                "Backlog",  # estado inicial
+                                0,
+                                "",
+                                "Backlog",
                                 datetime.now().strftime("%Y-%m-%d"),
                                 int(r["puntos"]),
                                 r["analista"],
