@@ -1237,6 +1237,7 @@ elif menu == "📥 Importar Excel":
         st.code("""               
 nombre
 prioridad                
+descripcion_desarrollo
 celula
 horas_mes
 puntos
@@ -1244,7 +1245,7 @@ analista
 categoria
 frecuencia
 sprint
-desarrolladores (separados por coma)
+desarrolladores
         """)
     
     with col_plant2:
@@ -1268,89 +1269,115 @@ desarrolladores (separados por coma)
     
     file = st.file_uploader(
         "Selecciona un archivo Excel",
-        type=["xlsx", "xls"],
-        help="El archivo debe tener las columnas especificadas en la plantilla"
+        type=["xlsx", "xls"]
     )
     
     if file:
+
         try:
+
             df_excel = pd.read_excel(file)
 
-            # Normalizar nombres de columnas del Excel
+            # NORMALIZAR COLUMNAS
             df_excel.columns = df_excel.columns.str.lower().str.strip()
 
-            #COLUMNAS REQUERIDAS
             columnas_requeridas = [
-                    'nombre',
-                    'prioridad',
-                    'descripcion_desarrollo',
-                    'celula',
-                    'horas_mes',
-                    'puntos',
-                    'analista',
-                    'categoria',
-                    'frecuencia',
-                    'sprint',
-                    'desarrolladores'
-                ]
-            
-            columnas_faltantes = [col for col in columnas_requeridas if col not in df_excel.columns]
-            
+                "nombre",
+                "prioridad",
+                "descripcion_desarrollo",
+                "celula",
+                "horas_mes",
+                "puntos",
+                "analista",
+                "categoria",
+                "frecuencia",
+                "sprint",
+                "desarrolladores"
+            ]
+
+            columnas_faltantes = [c for c in columnas_requeridas if c not in df_excel.columns]
+
             if columnas_faltantes:
-                st.error(f"❌ Faltan las siguientes columnas: {', '.join(columnas_faltantes)}")
-                st.info("💡 Descarga la plantilla para ver el formato correcto")
+
+                st.error(f"❌ Faltan columnas: {', '.join(columnas_faltantes)}")
+                st.info("💡 Descarga la plantilla oficial")
+
             else:
-                st.success(f"✅ Archivo válido. Se encontraron {len(df_excel)} tareas")
-                
-                # Vista previa
-                st.markdown("**Vista previa de los datos:**")
+
+                st.success(f"✅ Archivo válido: {len(df_excel)} tareas detectadas")
+
                 st.dataframe(df_excel.head(10), use_container_width=True)
-                
+
                 if st.button("📥 Importar Todas las Tareas", type="primary"):
+
                     contador = 0
                     errores = []
-                    
+
                     for idx, r in df_excel.iterrows():
+
                         try:
-                            # Procesar desarrolladores
-                            devs = [x.strip() for x in str(r["desarrolladores"]).split(",")]
-                            
+
+                            nombre = str(r["nombre"]).strip()
+
+                            prioridad = str(r["prioridad"]).upper().strip()
+                            if prioridad not in ["URGENTE", "MEDIA", "BAJA"]:
+                                prioridad = "MEDIA"
+
+                            descripcion = str(r.get("descripcion_desarrollo", "")).strip()
+
+                            celula = str(r["celula"]).strip()
+
+                            horas_mes = int(r["horas_mes"]) if pd.notna(r["horas_mes"]) else 0
+                            puntos = int(r["puntos"]) if pd.notna(r["puntos"]) else 0
+
+                            analista = str(r["analista"]).strip()
+                            categoria = str(r["categoria"]).strip()
+                            frecuencia = str(r["frecuencia"]).strip()
+                            sprint = str(r["sprint"]).strip()
+
+                            # desarrolladores
+                            if pd.notna(r["desarrolladores"]):
+                                devs = [x.strip() for x in str(r["desarrolladores"]).split(",")]
+                            else:
+                                devs = []
+
                             datos = (
-                                r["nombre"],
-                                r["prioridad"],
-                                r["descripcion_desarrollo"],
-                                r["celula"],
-                                int(r["horas_mes"]),
+                                nombre,
+                                prioridad,
+                                descripcion,
+                                celula,
+                                horas_mes,
                                 0,
                                 "",
                                 "Backlog",
                                 datetime.now().strftime("%Y-%m-%d"),
-                                int(r["puntos"]),
-                                r["analista"],
-                                r["categoria"],
-                                r["frecuencia"],
-                                r["sprint"]
+                                puntos,
+                                analista,
+                                categoria,
+                                frecuencia,
+                                sprint
                             )
-                            
+
                             if insertar_tarea(datos, devs):
                                 contador += 1
+
                         except Exception as e:
-                            errores.append(f"Fila {idx + 2}: {str(e)}")
-                    
+                            errores.append(f"Fila {idx+2}: {str(e)}")
+
                     if contador > 0:
-                        st.success(f"✅ {contador} tareas importadas exitosamente!")
+                        st.success(f"✅ {contador} tareas importadas correctamente")
                         st.balloons()
-                    
+
                     if errores:
-                        st.warning(f"⚠️ {len(errores)} errores encontrados:")
-                        for error in errores[:5]:
-                            st.text(error)
-                    
+                        st.warning(f"⚠️ {len(errores)} errores detectados")
+                        for e in errores[:5]:
+                            st.text(e)
+
                     st.rerun()
-                    
+
         except Exception as e:
-            st.error(f"❌ Error al leer el archivo: {str(e)}")
-            st.info("💡 Asegúrate de usar la plantilla correcta")
+
+            st.error(f"❌ Error al leer el Excel: {str(e)}")
 
 # -------------------------
 # EXPORTAR EXCEL
