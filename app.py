@@ -617,19 +617,21 @@ elif menu == "📝 Gestión de Tareas":
         
         # Acciones sobre tareas
         st.subheader("⚡ Acciones Rápidas")
-        
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "🔄 Cambiar Estado",
             "👥 Reasignar Equipo",
+            "🚦 Reasignar Prioridad",
             "✅ Finalizar Tarea",
             "✏️ Editar Tarea",
             "🗑️ Eliminar Tareas"
         ])
-        
+
         # TAB 1: Cambiar Estado
         with tab1:
-            col_e1, col_e2, col_e3 = st.columns([2, 2, 1])
-            
+
+            col_e1, col_e2, col_e3 = st.columns([2,2,1])
+
             with col_e1:
                 id_estado = st.number_input(
                     "ID de la tarea",
@@ -637,28 +639,34 @@ elif menu == "📝 Gestión de Tareas":
                     step=1,
                     key="id_estado"
                 )
-            
+
             with col_e2:
                 nuevo_estado = st.selectbox(
                     "Nuevo estado",
                     ["Backlog", "En progreso", "Terminado"],
                     key="nuevo_estado"
                 )
-            
+
             with col_e3:
                 st.markdown("<br>", unsafe_allow_html=True)
+
                 if st.button("🔄 Actualizar", use_container_width=True):
+
                     if id_estado in df['id'].values:
+
                         if actualizar_estado(id_estado, nuevo_estado):
                             st.success(f"✅ Estado actualizado a '{nuevo_estado}'")
                             st.rerun()
+
                     else:
                         st.error("❌ ID no encontrado")
-        
+
+
         # TAB 2: Reasignar Equipo
         with tab2:
-            col_r1, col_r2, col_r3 = st.columns([1, 2, 1])
-            
+
+            col_r1, col_r2, col_r3 = st.columns([1,2,1])
+
             with col_r1:
                 id_reasignar = st.number_input(
                     "ID de la tarea",
@@ -666,38 +674,51 @@ elif menu == "📝 Gestión de Tareas":
                     step=1,
                     key="id_reasignar"
                 )
-            
+
             with col_r2:
+
                 devs_disponibles = obtener_desarrolladores()
+
                 if not devs_disponibles.empty:
+
                     nuevos_devs = st.multiselect(
                         "Nuevo equipo",
                         devs_disponibles['nombre'].tolist(),
                         key="nuevos_devs"
                     )
+
                 else:
                     st.warning("No hay desarrolladores disponibles")
                     nuevos_devs = []
-            
+
             with col_r3:
+
                 st.markdown("<br>", unsafe_allow_html=True)
+
                 if st.button("👥 Reasignar", use_container_width=True):
+
                     if id_reasignar in df['id'].values:
+
                         if nuevos_devs:
+
                             if reasignar_desarrolladores(id_reasignar, nuevos_devs):
                                 st.success("✅ Equipo reasignado")
                                 st.rerun()
+
                         else:
                             st.error("❌ Debes seleccionar al menos un desarrollador")
+
                     else:
                         st.error("❌ ID no encontrado")
-        
+
+
         # TAB 3: Reasignar Prioridad
         with tab3:
 
             col_p1, col_p2, col_p3 = st.columns([2,2,1])
 
             with col_p1:
+
                 id_prioridad = st.number_input(
                     "ID de la tarea",
                     min_value=1,
@@ -706,13 +727,15 @@ elif menu == "📝 Gestión de Tareas":
                 )
 
             with col_p2:
+
                 nueva_prioridad = st.selectbox(
                     "Nueva Prioridad",
-                    ["URGENTE", "MEDIA", "BAJA"],
+                    ["URGENTE","MEDIA","BAJA"],
                     key="nueva_prioridad"
                 )
 
             with col_p3:
+
                 st.markdown("<br>", unsafe_allow_html=True)
 
                 if st.button("🚦 Actualizar Prioridad", use_container_width=True):
@@ -726,54 +749,64 @@ elif menu == "📝 Gestión de Tareas":
                     else:
                         st.error("❌ ID no encontrado")
 
-        # TAB 3: Finalizar Tarea
+
+        # TAB 4: Finalizar Tarea
         with tab4:
+
             st.markdown("**Complete los datos de finalización:**")
-            
-            col_f1, col_f2 = st.columns([1, 2])
-            
+
+            col_f1, col_f2 = st.columns([1,2])
+
             with col_f1:
+
                 id_finalizar = st.number_input(
                     "ID de la tarea",
                     min_value=1,
                     step=1,
                     key="id_finalizar"
                 )
-                
-                # Obtener horas originales de la tarea
+
                 tarea_actual = df[df['id'] == id_finalizar]
+
                 max_horas = int(tarea_actual['horas_mes'].values[0]) if not tarea_actual.empty else 1000
-                
+
                 horas_optimizadas = st.number_input(
                     "Horas Optimizadas/Mes",
                     min_value=0,
                     max_value=max_horas,
-                    value=0,
-                    help="Horas que toma ahora la tarea después de la automatización"
+                    value=0
                 )
-            
+
             with col_f2:
+
                 descripcion_auto = st.text_area(
                     "Descripción de la Automatización",
-                    placeholder="Describe cómo se automatizó o mejoró el proceso...",
                     height=150
                 )
-                
+
                 if st.button("✅ Finalizar Tarea", type="primary", use_container_width=True):
+
                     if id_finalizar in df['id'].values:
+
                         if descripcion_auto.strip():
+
                             if finalizar_tarea(id_finalizar, horas_optimizadas, descripcion_auto):
+
                                 ahorro = max_horas - horas_optimizadas
+
                                 st.success(f"✅ Tarea finalizada! Ahorro: {ahorro} horas/mes")
                                 st.balloons()
                                 st.rerun()
+
                         else:
                             st.error("❌ La descripción es obligatoria")
+
                     else:
                         st.error("❌ ID no encontrado")
-        
-        # TAB 4: EDITAR TAREA
-        with tab4:
+
+
+        # TAB 5: EDITAR TAREA COMPLETA
+        with tab5:
 
             st.markdown("### ✏️ Editar Información de la Tarea")
 
@@ -790,75 +823,118 @@ elif menu == "📝 Gestión de Tareas":
 
                 tarea = tarea.iloc[0]
 
-                nuevo_nombre = st.text_input("Nombre", value=tarea["nombre"])
-                nueva_prioridad = st.selectbox(
-                    "Prioridad",
-                    ["URGENTE", "MEDIA", "BAJA"],
-                    index=["URGENTE","MEDIA","BAJA"].index(tarea["prioridad"]) if tarea["prioridad"] in ["URGENTE","MEDIA","BAJA"] else 1
-                )
+                col1, col2 = st.columns(2)
 
-                nueva_celula = st.text_input("Célula", value=tarea["celula"])
+                with col1:
 
-                nuevas_horas = st.number_input(
-                    "Horas Mes",
-                    min_value=0,
-                    value=int(tarea["horas_mes"])
-                )
+                    nuevo_nombre = st.text_input("Nombre", tarea["nombre"])
+
+                    nueva_prioridad = st.selectbox(
+                        "Prioridad",
+                        ["URGENTE","MEDIA","BAJA"],
+                        index=["URGENTE","MEDIA","BAJA"].index(tarea["prioridad"])
+                    )
+
+                    nuevo_estado = st.selectbox(
+                        "Estado",
+                        ["Backlog","En progreso","Terminado"],
+                        index=["Backlog","En progreso","Terminado"].index(tarea["estado"])
+                    )
+
+                    nueva_celula = st.text_input("Célula", tarea["celula"])
+
+                    nuevo_sprint = st.text_input("Sprint", tarea["sprint"])
+
+                with col2:
+
+                    nuevas_horas = st.number_input(
+                        "Horas Mes",
+                        min_value=0,
+                        value=int(tarea["horas_mes"])
+                    )
+
+                    nuevas_horas_opt = st.number_input(
+                        "Horas Optimizadas",
+                        min_value=0,
+                        value=int(tarea["horas_optimizadas"])
+                    )
+
+                    nuevos_puntos = st.number_input(
+                        "Puntos",
+                        min_value=0,
+                        value=int(tarea["puntos"])
+                    )
+
+                    nuevo_analista = st.text_input("Analista", tarea["analista"])
+
+                nueva_categoria = st.text_input("Categoría", tarea["categoria"])
+
+                nueva_frecuencia = st.text_input("Frecuencia", tarea["frecuencia"])
 
                 nueva_desc = st.text_area(
                     "Descripción del Desarrollo",
-                    value=tarea.get("descripcion_desarrollo","")
+                    tarea.get("descripcion_desarrollo","")
                 )
 
                 if st.button("💾 Guardar Cambios"):
 
                     supabase.table("desarrollos").update({
+
                         "nombre": nuevo_nombre,
                         "prioridad": nueva_prioridad,
+                        "estado": nuevo_estado,
                         "celula": nueva_celula,
+                        "sprint": nuevo_sprint,
                         "horas_mes": nuevas_horas,
+                        "horas_optimizadas": nuevas_horas_opt,
+                        "puntos": nuevos_puntos,
+                        "analista": nuevo_analista,
+                        "categoria": nueva_categoria,
+                        "frecuencia": nueva_frecuencia,
                         "descripcion_desarrollo": nueva_desc
+
                     }).eq("id", id_editar).execute()
 
                     st.success("✅ Tarea actualizada correctamente")
                     st.rerun()
 
-        # TAB 5: Eliminar Tareas
-        with tab5:
+
+        # TAB 6: Eliminar Tareas
+        with tab6:
+
             st.markdown("### 🗑️ Eliminación Masiva de Tareas")
-            st.warning("⚠️ Esta acción no se puede deshacer. Asegúrate de seleccionar las tareas correctas.")
-            
-            # Crear lista de tareas para seleccionar
+
             opciones_tareas = df_filtrado.apply(
-                lambda row: f"ID {row['id']} - {row['nombre']} ({row['estado']})", 
+                lambda row: f"ID {row['id']} - {row['nombre']} ({row['estado']})",
                 axis=1
             ).tolist()
-            
+
             tareas_ids = df_filtrado['id'].tolist()
-            
-            # Diccionario para mapear texto a ID
+
             opciones_dict = dict(zip(opciones_tareas, tareas_ids))
-            
+
             tareas_seleccionadas = st.multiselect(
                 "Selecciona las tareas a eliminar:",
-                opciones_tareas,
-                help="Puedes seleccionar múltiples tareas"
+                opciones_tareas
             )
-            
+
             if tareas_seleccionadas:
+
                 ids_a_eliminar = [opciones_dict[tarea] for tarea in tareas_seleccionadas]
-                
-                col_del1, col_del2 = st.columns([3, 1])
-                
+
+                col_del1, col_del2 = st.columns([3,1])
+
                 with col_del1:
                     st.error(f"⚠️ Vas a eliminar {len(ids_a_eliminar)} tarea(s)")
-                
+
                 with col_del2:
+
                     if st.button("🗑️ Confirmar Eliminación", type="primary", use_container_width=True):
+
                         if eliminar_tareas_multiples(ids_a_eliminar):
+
                             st.success(f"✅ {len(ids_a_eliminar)} tarea(s) eliminada(s)")
                             st.rerun()
-
 # -------------------------
 # NUEVA TAREA
 # -------------------------
