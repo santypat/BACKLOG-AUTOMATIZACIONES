@@ -231,6 +231,19 @@ def actualizar_estado(id, estado):
         st.error(f"Error al actualizar estado: {e}")
         return False
 
+def actualizar_prioridad(id_tarea, nueva_prioridad):
+    """Actualiza la prioridad de una tarea"""
+    try:
+        supabase.table("desarrollos").update({
+            "prioridad": nueva_prioridad
+        }).eq("id", id_tarea).execute()
+
+        return True
+
+    except Exception as e:
+        st.error(f"Error al actualizar prioridad: {e}")
+        return False
+
 def finalizar_tarea(id, horas_opt, descripcion):
     """Finaliza una tarea registrando fecha y duración"""
 
@@ -529,9 +542,10 @@ elif menu == "📝 Gestión de Tareas":
         # Acciones sobre tareas
         st.subheader("⚡ Acciones Rápidas")
         
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "🔄 Cambiar Estado", 
             "👥 Reasignar Equipo", 
+            "🚦 Reasignar Prioridad",
             "✅ Finalizar Tarea",
             "🗑️ Eliminar Tareas"
         ])
@@ -602,8 +616,42 @@ elif menu == "📝 Gestión de Tareas":
                     else:
                         st.error("❌ ID no encontrado")
         
-        # TAB 3: Finalizar Tarea
+        # TAB 3: Reasignar Prioridad
         with tab3:
+
+            col_p1, col_p2, col_p3 = st.columns([2,2,1])
+
+            with col_p1:
+                id_prioridad = st.number_input(
+                    "ID de la tarea",
+                    min_value=1,
+                    step=1,
+                    key="id_prioridad"
+                )
+
+            with col_p2:
+                nueva_prioridad = st.selectbox(
+                    "Nueva Prioridad",
+                    ["URGENTE", "MEDIA", "BAJA"],
+                    key="nueva_prioridad"
+                )
+
+            with col_p3:
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                if st.button("🚦 Actualizar Prioridad", use_container_width=True):
+
+                    if id_prioridad in df['id'].values:
+
+                        if actualizar_prioridad(id_prioridad, nueva_prioridad):
+                            st.success(f"✅ Prioridad actualizada a {nueva_prioridad}")
+                            st.rerun()
+
+                    else:
+                        st.error("❌ ID no encontrado")
+
+        # TAB 3: Finalizar Tarea
+        with tab4:
             st.markdown("**Complete los datos de finalización:**")
             
             col_f1, col_f2 = st.columns([1, 2])
@@ -649,7 +697,7 @@ elif menu == "📝 Gestión de Tareas":
                         st.error("❌ ID no encontrado")
         
         # TAB 4: Eliminar Tareas
-        with tab4:
+        with tab5:
             st.markdown("### 🗑️ Eliminación Masiva de Tareas")
             st.warning("⚠️ Esta acción no se puede deshacer. Asegúrate de seleccionar las tareas correctas.")
             
