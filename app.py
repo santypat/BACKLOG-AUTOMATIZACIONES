@@ -6,6 +6,7 @@ import os
 import io
 import plotly.express as px
 
+
 def actualizar_tarea(datos, devs):
 
     try:
@@ -852,147 +853,139 @@ elif menu == "📝 Gestión de Tareas":
                         st.error("❌ ID no encontrado")
 
 
-        # TAB: EDITAR TAREA
-        st.subheader("✏️ Editar información de la tarea")
+    
+        # TAB 5: EDITAR TAREA
+        with tab5:
 
-        id_editar = st.number_input(
-            "ID de la tarea",
-            min_value=1,
-            step=1,
-            key="editar_id"
-        )
+            st.subheader("✏️ Editar Desarrollo")
 
-        tarea = df[df["id"] == id_editar]
+            id_editar = st.number_input(
+                "ID de la tarea a editar",
+                min_value=1,
+                step=1
+            )
 
-        if not tarea.empty:
+            tarea_df = df[df["id"] == id_editar]
 
-            tarea = tarea.iloc[0]
+            if not tarea_df.empty:
 
-            with st.form("form_editar_tarea"):
+                tarea = tarea_df.iloc[0]
 
-                col1, col2 = st.columns(2)
+                prioridades = ["URGENTE", "MEDIA", "BAJA"]
+                prioridad_actual = str(tarea.get("prioridad", "MEDIA")).upper()
 
-                with col1:
+                if prioridad_actual not in prioridades:
+                    prioridad_actual = "MEDIA"
 
-                    nombre = st.text_input(
-                        "Nombre de la tarea",
-                        value=tarea["nombre"]
-                    )
+                with st.form("form_editar_tarea"):
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+
+                        nombre = st.text_input(
+                            "Nombre del desarrollo",
+                            value=tarea.get("nombre", "")
+                        )
+
+                        celula = st.text_input(
+                            "Célula",
+                            value=tarea.get("celula", "")
+                        )
+
+                        prioridad = st.selectbox(
+                            "Prioridad",
+                            prioridades,
+                            index=prioridades.index(prioridad_actual)
+                        )
+
+                        horas_mes = st.number_input(
+                            "Horas Mes",
+                            min_value=0,
+                            value=int(tarea.get("horas_mes", 0))
+                        )
+
+                        puntos = st.number_input(
+                            "Puntos",
+                            min_value=0,
+                            value=int(tarea.get("puntos", 0))
+                        )
+
+                    with col2:
+
+                        analista = st.text_input(
+                            "Analista",
+                            value=tarea.get("analista", "")
+                        )
+
+                        categoria = st.text_input(
+                            "Categoría",
+                            value=tarea.get("categoria", "")
+                        )
+
+                        frecuencia = st.text_input(
+                            "Frecuencia",
+                            value=tarea.get("frecuencia", "")
+                        )
+
+                        sprint = st.text_input(
+                            "Sprint",
+                            value=tarea.get("sprint", "")
+                        )
 
                     descripcion = st.text_area(
                         "Descripción del desarrollo",
-                        value=tarea.get("descripcion", "")
+                        value=tarea.get("descripcion_desarrollo", "")
                     )
-
-                    prioridad = st.selectbox(
-                        "Prioridad",
-                        ["URGENTE", "MEDIA", "BAJA"],
-                        index=["URGENTE","MEDIA","BAJA"].index(
-                            str(tarea.get("prioridad","MEDIA")).upper()
-                        )
-                    )
-
-                    celula = st.text_input(
-                        "Célula",
-                        value=tarea["celula"]
-                    )
-
-                    analista = st.text_input(
-                        "Analista",
-                        value=tarea["analista"]
-                    )
-
-                with col2:
-
-                    horas_mes = st.number_input(
-                        "Horas mensuales",
-                        value=int(tarea["horas_mes"])
-                    )
-
-                    horas_opt = st.number_input(
-                        "Horas optimizadas",
-                        value=int(tarea.get("horas_optimizadas",0))
-                    )
-
-                    puntos = st.number_input(
-                        "Puntos",
-                        value=int(tarea["puntos"])
-                    )
-
-                    categoria = st.text_input(
-                        "Categoría",
-                        value=tarea["categoria"]
-                    )
-
-                    frecuencia = st.text_input(
-                        "Frecuencia",
-                        value=tarea["frecuencia"]
-                    )
-
-                col3, col4 = st.columns(2)
-
-                with col3:
-
-                    sprint = st.text_input(
-                        "Sprint",
-                        value=tarea["sprint"]
-                    )
-
-                with col4:
-
-                    desarrolladores = st.text_input(
-                        "Desarrolladores (separados por coma)",
-                        value=tarea["desarrolladores"]
-                    )
-
-                col_fecha1, col_fecha2 = st.columns(2)
-
-                with col_fecha1:
 
                     fecha_inicio = st.date_input(
                         "Fecha inicio desarrollo",
-                        value=pd.to_datetime(tarea.get("fecha_inicio")).date()
-                        if tarea.get("fecha_inicio") else None
+                        value=pd.to_datetime(
+                            tarea.get("fecha_inicio", datetime.now())
+                        )
                     )
-
-                with col_fecha2:
 
                     fecha_fin = st.date_input(
                         "Fecha fin desarrollo",
-                        value=pd.to_datetime(tarea.get("fecha_fin")).date()
-                        if tarea.get("fecha_fin") else None
+                        value=pd.to_datetime(
+                            tarea.get("fecha_fin", datetime.now())
+                        )
                     )
 
-                guardar = st.form_submit_button("💾 Guardar cambios")
+                    desarrolladores = st.text_input(
+                        "Desarrolladores (separados por coma)",
+                        value=tarea.get("desarrolladores", "")
+                    )
+
+                    guardar = st.form_submit_button("💾 Guardar Cambios")
 
                 if guardar:
 
                     devs = [x.strip() for x in desarrolladores.split(",")]
 
-                    datos_actualizados = (
-                        nombre,
-                        celula,
-                        horas_mes,
-                        horas_opt,
-                        descripcion,
-                        prioridad,
-                        puntos,
-                        analista,
-                        categoria,
-                        frecuencia,
-                        sprint,
-                        fecha_inicio,
-                        fecha_fin,
-                        id_editar
-                    )
+                    supabase.table("desarrollos").update({
 
-                    if actualizar_tarea(datos_actualizados, devs):
+                        "nombre": nombre,
+                        "celula": celula,
+                        "prioridad": prioridad,
+                        "horas_mes": horas_mes,
+                        "puntos": puntos,
+                        "analista": analista,
+                        "categoria": categoria,
+                        "frecuencia": frecuencia,
+                        "sprint": sprint,
+                        "descripcion_desarrollo": descripcion,
+                        "fecha_inicio": str(fecha_inicio),
+                        "fecha_fin": str(fecha_fin),
+                        "desarrolladores": ", ".join(devs)
 
-                        st.success("✅ Tarea actualizada correctamente")
-                        st.rerun()
+                    }).eq("id", id_editar).execute()
 
-        else:
-            st.info("Ingresa un ID válido para editar")
+                    st.success("✅ Desarrollo actualizado correctamente")
+                    st.rerun()
+
+            else:
+                st.info("Introduce un ID válido para editar la tarea")
 
         # TAB 6: Eliminar Tareas
         with tab6:
