@@ -728,10 +728,17 @@ elif menu == "📝 Gestión de Tareas":
 
             with col_p2:
 
+                prioridades = ["URGENTE", "MEDIA", "BAJA"]
+
+                prioridad_actual = str(tarea.get("prioridad", "")).upper()
+
+                if prioridad_actual not in prioridades:
+                    prioridad_actual = "MEDIA"
+
                 nueva_prioridad = st.selectbox(
-                    "Nueva Prioridad",
-                    ["URGENTE","MEDIA","BAJA"],
-                    key="nueva_prioridad"
+                    "Prioridad",
+                    prioridades,
+                    index=prioridades.index(prioridad_actual)
                 )
 
             with col_p3:
@@ -838,8 +845,8 @@ elif menu == "📝 Gestión de Tareas":
                     nuevo_estado = st.selectbox(
                         "Estado",
                         ["Backlog","En progreso","Terminado"],
-                        index=["Backlog","En progreso","Terminado"].index(tarea["estado"])
-                    )
+                       index=["Backlog","En progreso","Terminado"].index(tarea["estado"])
+                     )
 
                     nueva_celula = st.text_input("Célula", tarea["celula"])
 
