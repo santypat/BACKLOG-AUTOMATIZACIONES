@@ -1,506 +1,1021 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
-from datetime import datetime, date
-import plotly.express as px
-import plotly.graph_objects as go
+from datetime import datetime
+from supabase import create_client
+import os
+import io
 
-# Configuración de la página
-st.set_page_config(page_title="Gestor de Tareas", layout="wide", page_icon="📋")
+#SEMAFORIZACION
 
-# Función para crear la base de datos
-def crear_base_datos():
-    conn = sqlite3.connect('tareas.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS tareas
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  titulo TEXT NOT NULL,
-                  descripcion TEXT,
-                  desarrollador TEXT NOT NULL,
-                  celula TEXT NOT NULL,
-                  estado TEXT NOT NULL,
-                  prioridad TEXT NOT NULL,
-                  fecha_creacion TEXT NOT NULL,
-                  fecha_inicio TEXT,
-                  fecha_finalizacion TEXT,
-                  horas_operativas REAL,
-                  horas_optimizadas REAL)''')
-    conn.commit()
-    conn.close()
+def mostrar_prioridad(valor):
 
-# Función para agregar tarea
-def agregar_tarea(titulo, descripcion, desarrollador, celula, estado, prioridad, 
-                  fecha_inicio=None, fecha_finalizacion=None, horas_operativas=None, horas_optimizadas=None):
-    conn = sqlite3.connect('tareas.db')
-    c = conn.cursor()
-    fecha_creacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.execute('''INSERT INTO tareas (titulo, descripcion, desarrollador, celula, estado, prioridad, 
-                 fecha_creacion, fecha_inicio, fecha_finalizacion, horas_operativas, horas_optimizadas)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-              (titulo, descripcion, desarrollador, celula, estado, prioridad, 
-               fecha_creacion, fecha_inicio, fecha_finalizacion, horas_operativas, horas_optimizadas))
-    conn.commit()
-    conn.close()
+    if valor == "URGENTE":
+        return "🔴 URGENTE"
 
-# Función para obtener todas las tareas
-def obtener_tareas():
-    conn = sqlite3.connect('tareas.db')
-    df = pd.read_sql_query("SELECT * FROM tareas ORDER BY fecha_creacion DESC", conn)
-    conn.close()
-    return df
+    elif valor == "MEDIA":
+        return "🟡 MEDIA"
 
-# Función para actualizar tarea
-def actualizar_tarea(id_tarea, titulo, descripcion, desarrollador, celula, estado, prioridad,
-                     fecha_inicio, fecha_finalizacion, horas_operativas, horas_optimizadas):
-    conn = sqlite3.connect('tareas.db')
-    c = conn.cursor()
-    c.execute('''UPDATE tareas 
-                 SET titulo=?, descripcion=?, desarrollador=?, celula=?, estado=?, prioridad=?,
-                     fecha_inicio=?, fecha_finalizacion=?, horas_operativas=?, horas_optimizadas=?
-                 WHERE id=?''',
-              (titulo, descripcion, desarrollador, celula, estado, prioridad,
-               fecha_inicio, fecha_finalizacion, horas_operativas, horas_optimizadas, id_tarea))
-    conn.commit()
-    conn.close()
+    elif valor == "BAJA":
+        return "🟢 BAJA"
 
-# Función para eliminar tarea
-def eliminar_tarea(id_tarea):
-    conn = sqlite3.connect('tareas.db')
-    c = conn.cursor()
-    c.execute("DELETE FROM tareas WHERE id=?", (id_tarea,))
-    conn.commit()
-    conn.close()
+    return ""
+# -------------------------
+# CONFIGURACIÓN
+# -------------------------
 
-# Función para obtener el color de prioridad
-def get_prioridad_color(prioridad):
-    colores = {
-        "🔴 URGENTE": "#FF4444",
-        "🟡 MEDIA": "#FFB84D",
-        "🟢 BAJA": "#4CAF50"
+st.set_page_config(
+    page_title="Backlog de Desarrollos",
+    layout="wide",
+    page_icon="📊"
+)
+
+# Estilos CSS personalizados
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1f77b4;
+        margin-bottom: 1rem;
     }
-    return colores.get(prioridad, "#CCCCCC")
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+    }
+    .stButton>button {
+        border-radius: 8px;
+        font-weight: 600;
+    }
+    div[data-baseweb="select"] > div {
+        background-color: #f8f9fa;
+    }
+    .stDataFrame {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Inicializar base de datos
-crear_base_datos()
+# -------------------------
+# SUPABASE
+# -------------------------
 
-# Título principal
-st.title("📋 Sistema de Gestión de Tareas")
-st.markdown("---")
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
 
-# Menú lateral
-menu = st.sidebar.selectbox("🗂️ Menú", ["Panel de Control", "Gestión de Tareas", "Análisis y Gráficos"])
+supabase = create_client(url, key)
 
-# ============================================
-# PANEL DE CONTROL
-# ============================================
-if menu == "Panel de Control":
-    st.header("📊 Panel de Control")
+# -------------------------
+# FUNCIONES DB
+# -------------------------
+
+def obtener_desarrolladores():
+    """Obtiene todos los desarrolladores activos"""
+    try:
+        data = supabase.table("desarrolladores").select("*").execute()
+        return pd.DataFrame(data.data)
+    except Exception as e:
+        st.error(f"Error al obtener desarrolladores: {e}")
+        return pd.DataFrame()
+
+def agregar_desarrollador(nombre):
+    """Agrega un nuevo desarrollador"""
+    try:
+        supabase.table("desarrolladores").insert({"nombre": nombre}).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al agregar desarrollador: {e}")
+        return False
+
+def eliminar_desarrollador(id):
+    """Elimina un desarrollador"""
+    try:
+        supabase.table("desarrolladores").delete().eq("id", id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al eliminar desarrollador: {e}")
+        return False
+
+def obtener_dev_id(nombre):
+    """Obtiene el ID de un desarrollador por nombre"""
+    try:
+        r = supabase.table("desarrolladores").select("id").eq("nombre", nombre).execute()
+        if r.data:
+            return r.data[0]["id"]
+        return None
+    except Exception as e:
+        st.error(f"Error al obtener ID del desarrollador: {e}")
+        return None
+
+def insertar_tarea(datos, devs):
+    """Inserta una nueva tarea con sus desarrolladores asignados"""
+    try:
+        # Insertar desarrollo
+        r = supabase.table("desarrollos").insert({
+            "prioridad": prioridad,
+            "nombre": datos[0],
+            "celula": datos[1],
+            "horas_mes": datos[2],
+            "horas_optimizadas": datos[3],
+            "descripcion": datos[4],
+            "estado": datos[5],
+            "fecha": datos[6],
+            "puntos": datos[7],
+            "analista": datos[8],
+            "categoria": datos[9],
+            "frecuencia": datos[10],
+            "sprint": datos[11]
+        }).execute()
+        
+        desarrollo_id = r.data[0]["id"]
+        
+        # Insertar relaciones con desarrolladores
+        for dev in devs:
+            dev_id = obtener_dev_id(dev)
+            if dev_id:
+                supabase.table("desarrollo_dev").insert({
+                    "desarrollo_id": desarrollo_id,
+                    "dev_id": dev_id
+                }).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error al insertar tarea: {e}")
+        return False
+
+def obtener_tareas():
+    """Obtiene todas las tareas con sus desarrolladores asignados"""
+    try:
+        # Obtener tareas
+        tareas = supabase.table("desarrollos").select("*").execute()
+        df = pd.DataFrame(tareas.data)
+
+        if df.empty:
+            return df
+
+        # Aplicar semaforización de prioridad
+        if "prioridad" in df.columns:
+            df["Prioridad"] = df["prioridad"].fillna("").apply(mostrar_prioridad)
+        else:
+            df["Prioridad"] = ""
+
+        # Obtener relaciones
+        rel = supabase.table("desarrollo_dev").select("*").execute()
+        rel_df = pd.DataFrame(rel.data)
+
+        # Obtener desarrolladores
+        devs = supabase.table("desarrolladores").select("*").execute()
+        devs_df = pd.DataFrame(devs.data)
+
+        # Unir relaciones con desarrolladores
+        if not rel_df.empty and not devs_df.empty:
+            rel_df = rel_df.merge(
+                devs_df,
+                left_on="dev_id",
+                right_on="id",
+                suffixes=('_rel', '_dev')
+            )
+
+            # Agrupar desarrolladores por tarea
+            rel_grouped = rel_df.groupby("desarrollo_id")["nombre"].apply(
+                lambda x: ", ".join(x)
+            ).reset_index()
+
+            rel_grouped.columns = ["desarrollo_id", "desarrolladores"]
+
+            # Unir con tareas
+            df = df.merge(
+                rel_grouped,
+                left_on="id",
+                right_on="desarrollo_id",
+                how="left"
+            )
+
+            df["desarrolladores"] = df["desarrolladores"].fillna("Sin asignar")
+
+        else:
+            df["desarrolladores"] = "Sin asignar"
+
+        # Calcular horas restantes
+        df["horas_restantes"] = df["horas_mes"] - df["horas_optimizadas"]
+
+        # Ordenar por ID descendente (más recientes primero)
+        df = df.sort_values("id", ascending=False)
+
+        return df
+
+    except Exception as e:
+        st.error(f"Error al obtener tareas: {e}")
+        return pd.DataFrame()
+
+def actualizar_estado(id, estado):
+    """Actualiza el estado de una tarea con control de tiempos"""
+    try:
+
+        data_update = {
+            "estado": estado
+        }
+
+        # registrar inicio
+        if estado == "En Proceso":
+            data_update["fecha_inicio"] = datetime.now().isoformat()
+
+        supabase.table("desarrollos").update(data_update).eq("id", id).execute()
+
+        return True
+
+    except Exception as e:
+        st.error(f"Error al actualizar estado: {e}")
+        return False
+
+def finalizar_tarea(id, horas_opt, descripcion):
+    """Finaliza una tarea registrando fecha y duración"""
+
+    try:
+
+        # obtener fecha_inicio
+        tarea = supabase.table("desarrollos").select("fecha_inicio").eq("id", id).execute()
+
+        fecha_inicio = None
+
+        if tarea.data:
+            fecha_inicio = tarea.data[0]["fecha_inicio"]
+
+        fecha_fin = datetime.now()
+
+        duracion = None
+
+        if fecha_inicio:
+            inicio = pd.to_datetime(fecha_inicio)
+            duracion = (fecha_fin - inicio).total_seconds() / 3600
+
+        supabase.table("desarrollos").update({
+            "estado": "Terminado",
+            "horas_optimizadas": horas_opt,
+            "descripcion": descripcion,
+            "fecha_fin": fecha_fin.isoformat(),
+            "duracion_horas": duracion
+        }).eq("id", id).execute()
+
+        return True
+
+    except Exception as e:
+        st.error(f"Error al finalizar tarea: {e}")
+        return False
+
+def reasignar_desarrolladores(tarea_id, nuevos_devs):
+    """Reasigna desarrolladores a una tarea"""
+    try:
+        # Eliminar asignaciones actuales
+        supabase.table("desarrollo_dev").delete().eq(
+            "desarrollo_id", tarea_id
+        ).execute()
+        
+        # Insertar nuevas asignaciones
+        for dev in nuevos_devs:
+            dev_id = obtener_dev_id(dev)
+            if dev_id:
+                supabase.table("desarrollo_dev").insert({
+                    "desarrollo_id": tarea_id,
+                    "dev_id": dev_id
+                }).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error al reasignar desarrolladores: {e}")
+        return False
+
+def eliminar_tarea(id):
+    """Elimina una tarea y sus relaciones"""
+    try:
+        # Eliminar relaciones primero
+        supabase.table("desarrollo_dev").delete().eq(
+            "desarrollo_id", id
+        ).execute()
+        
+        # Eliminar tarea
+        supabase.table("desarrollos").delete().eq(
+            "id", id
+        ).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error al eliminar tarea: {e}")
+        return False
+
+def eliminar_tareas_multiples(ids):
+    """Elimina múltiples tareas"""
+    try:
+        for id in ids:
+            eliminar_tarea(id)
+        return True
+    except Exception as e:
+        st.error(f"Error al eliminar tareas: {e}")
+        return False
+
+def crear_plantilla_excel():
+    """Crea un archivo Excel de plantilla"""
+    plantilla = pd.DataFrame(columns=[
+        'nombre',
+        'celula',
+        'horas_mes',
+        'puntos',
+        'analista',
+        'categoria',
+        'frecuencia',
+        'sprint',
+        'desarrolladores'
+    ])
+    
+    # Agregar fila de ejemplo
+    plantilla.loc[0] = [
+        'Ejemplo: Automatización de reportes',
+        'Backend',
+        40,
+        8,
+        'María García',
+        'PROCESO',
+        'Mensual',
+        'Sprint 1',
+        'Juan Pérez, Carlos López'
+    ]
+    
+    return plantilla
+
+# -------------------------
+# SIDEBAR
+# -------------------------
+
+st.sidebar.markdown("## 🎯 Menú de Navegación")
+menu = st.sidebar.selectbox(
+    "Selecciona una opción:",
+    [
+        "📊 Dashboard",
+        "📝 Gestión de Tareas",
+        "➕ Nueva Tarea",
+        "👨‍💻 Desarrolladores",
+        "📥 Importar Excel",
+        "📤 Exportar Excel"
+    ]
+)
+
+# Info en sidebar
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📈 Estadísticas Rápidas")
+df_sidebar = obtener_tareas()
+st.sidebar.metric("Total de Tareas", len(df_sidebar))
+if not df_sidebar.empty:
+    st.sidebar.metric("Tareas Activas", len(df_sidebar[df_sidebar['estado'] != 'Terminado']))
+    st.sidebar.metric("Horas Ahorradas/Mes", int(df_sidebar['horas_optimizadas'].sum()))
+
+# -------------------------
+# DASHBOARD
+# -------------------------
+
+if menu == "📊 Dashboard":
+    st.markdown('<h1 class="main-header">📊 Dashboard de Desarrollos</h1>', unsafe_allow_html=True)
     
     df = obtener_tareas()
     
-    if not df.empty:
-        # Filtros
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            celulas_unicas = ["Todas"] + list(df['celula'].unique())
-            celula_filtro = st.selectbox("Filtrar por Célula", celulas_unicas)
-        with col_f2:
-            desarrolladores_unicos = ["Todos"] + list(df['desarrollador'].unique())
-            desarrollador_filtro = st.selectbox("Filtrar por Desarrollador", desarrolladores_unicos)
-        
-        # Aplicar filtros
-        df_filtrado = df.copy()
-        if celula_filtro != "Todas":
-            df_filtrado = df_filtrado[df_filtrado['celula'] == celula_filtro]
-        if desarrollador_filtro != "Todos":
-            df_filtrado = df_filtrado[df_filtrado['desarrollador'] == desarrollador_filtro]
-        
+    if df.empty:
+        st.info("📭 No hay tareas registradas. Crea una nueva tarea para comenzar.")
+    else:
         # Métricas principales
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3, col4 = st.columns(4)
         
-        with col1:
-            total_tareas = len(df_filtrado)
-            st.metric("📝 Total Tareas", total_tareas)
+        total_tareas = len(df)
+        total_horas_mes = int(df["horas_mes"].sum())
+        total_horas_opt = int(df["horas_optimizadas"].sum())
+        ahorro_total = total_horas_mes - total_horas_opt
         
-        with col2:
-            tareas_pendientes = len(df_filtrado[df_filtrado['estado'] == 'Pendiente'])
-            st.metric("⏳ Pendientes", tareas_pendientes)
+        col1.metric("📦 Total Tareas", total_tareas)
+        col2.metric("⏱️ Horas/Mes", f"{total_horas_mes:,}")
+        col3.metric("✨ Horas Optimizadas", f"{total_horas_opt:,}")
+        col4.metric("🚀 Ahorro Total", f"{ahorro_total:,}", delta=f"{ahorro_total} horas")
         
-        with col3:
-            tareas_en_proceso = len(df_filtrado[df_filtrado['estado'] == 'En Proceso'])
-            st.metric("🔄 En Proceso", tareas_en_proceso)
+        st.divider()
         
-        with col4:
-            tareas_completadas = len(df_filtrado[df_filtrado['estado'] == 'Completada'])
-            st.metric("✅ Completadas", tareas_completadas)
-        
-        with col5:
-            # Calcular porcentaje de optimización
-            df_con_datos = df_filtrado.dropna(subset=['horas_operativas', 'horas_optimizadas'])
-            if len(df_con_datos) > 0:
-                total_operativas = df_con_datos['horas_operativas'].sum()
-                total_optimizadas = df_con_datos['horas_optimizadas'].sum()
-                if total_operativas > 0:
-                    porcentaje_optimizado = ((total_operativas - total_optimizadas) / total_operativas) * 100
-                    st.metric("⚡ Tiempo Optimizado", f"{porcentaje_optimizado:.1f}%")
-                else:
-                    st.metric("⚡ Tiempo Optimizado", "0%")
-            else:
-                st.metric("⚡ Tiempo Optimizado", "N/A")
-        
-        st.markdown("---")
-        
-        # Gráfico de distribución por estado
+        # Gráficos
         col_g1, col_g2 = st.columns(2)
         
         with col_g1:
             st.subheader("📊 Distribución por Estado")
-            estado_count = df_filtrado['estado'].value_counts()
-            fig_estado = px.pie(values=estado_count.values, names=estado_count.index,
-                               color_discrete_sequence=['#FFB84D', '#4A90E2', '#4CAF50'])
-            st.plotly_chart(fig_estado, use_container_width=True)
+            estado_counts = df['estado'].value_counts()
+            st.bar_chart(estado_counts)
         
         with col_g2:
-            st.subheader("🚦 Distribución por Prioridad")
-            prioridad_count = df_filtrado['prioridad'].value_counts()
-            colors_prioridad = [get_prioridad_color(p) for p in prioridad_count.index]
-            fig_prioridad = px.pie(values=prioridad_count.values, names=prioridad_count.index,
-                                  color_discrete_sequence=colors_prioridad)
-            st.plotly_chart(fig_prioridad, use_container_width=True)
+            st.subheader("🎯 Tareas por Sprint")
+            sprint_counts = df['sprint'].value_counts().head(10)
+            st.bar_chart(sprint_counts)
         
-        # Tabla de tareas urgentes
-        st.subheader("🔥 Tareas Urgentes")
-        tareas_urgentes = df_filtrado[df_filtrado['prioridad'] == '🔴 URGENTE']
-        if not tareas_urgentes.empty:
-            st.dataframe(tareas_urgentes[['titulo', 'desarrollador', 'celula', 'estado', 'fecha_creacion']], 
-                        use_container_width=True)
-        else:
-            st.info("No hay tareas urgentes en este momento.")
-    else:
-        st.info("📭 No hay tareas registradas. Ve a 'Gestión de Tareas' para agregar una nueva.")
-
-# ============================================
-# GESTIÓN DE TAREAS
-# ============================================
-elif menu == "Gestión de Tareas":
-    st.header("🎯 Gestión de Tareas")
-    
-    tab1, tab2, tab3 = st.tabs(["➕ Nueva Tarea", "📋 Ver Tareas", "✏️ Editar/Eliminar"])
-    
-    # Tab 1: Nueva Tarea
-    with tab1:
-        st.subheader("Crear Nueva Tarea")
+        st.divider()
         
-        with st.form("nueva_tarea_form"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                titulo = st.text_input("📌 Título de la Tarea*", placeholder="Ej: Desarrollar módulo de reportes")
-                desarrollador = st.text_input("👤 Desarrollador*", placeholder="Nombre del desarrollador")
-                estado = st.selectbox("📊 Estado*", ["Pendiente", "En Proceso", "Completada"])
-                fecha_inicio = st.date_input("📅 Fecha de Inicio", value=None)
-                horas_operativas = st.number_input("⏱️ Horas Operativas (Manual)", min_value=0.0, step=0.5, value=0.0)
-            
-            with col2:
-                descripcion = st.text_area("📝 Descripción", placeholder="Descripción detallada de la tarea")
-                celula = st.text_input("🏢 Célula*", placeholder="Ej: Desarrollo, QA, DevOps")
-                prioridad = st.selectbox("🚦 Prioridad*", ["🔴 URGENTE", "🟡 MEDIA", "🟢 BAJA"])
-                fecha_finalizacion = st.date_input("🏁 Fecha de Finalización", value=None)
-                horas_optimizadas = st.number_input("⚡ Horas Optimizadas", min_value=0.0, step=0.5, value=0.0)
-            
-            submitted = st.form_submit_button("✅ Crear Tarea", use_container_width=True)
-            
-            if submitted:
-                if titulo and desarrollador and celula:
-                    fecha_inicio_str = fecha_inicio.strftime("%Y-%m-%d") if fecha_inicio else None
-                    fecha_fin_str = fecha_finalizacion.strftime("%Y-%m-%d") if fecha_finalizacion else None
-                    
-                    agregar_tarea(titulo, descripcion, desarrollador, celula, estado, prioridad,
-                                fecha_inicio_str, fecha_fin_str, horas_operativas if horas_operativas > 0 else None,
-                                horas_optimizadas if horas_optimizadas > 0 else None)
-                    st.success("✅ Tarea creada exitosamente!")
-                    st.rerun()
-                else:
-                    st.error("⚠️ Por favor completa todos los campos obligatorios (*).")
-    
-    # Tab 2: Ver Tareas
-    with tab2:
-        st.subheader("Lista de Tareas")
+        # Tabla de impacto
+        st.subheader("💡 Top 10 Automatizaciones por Impacto")
+        df_terminadas = df[df['estado'] == 'Terminado'].copy()
         
-        df = obtener_tareas()
-        
-        if not df.empty:
-            # Filtros
-            col_f1, col_f2, col_f3 = st.columns(3)
-            with col_f1:
-                estado_filtro = st.multiselect("Filtrar por Estado", 
-                                              options=df['estado'].unique(),
-                                              default=df['estado'].unique())
-            with col_f2:
-                celula_filtro_ver = st.multiselect("Filtrar por Célula",
-                                                   options=df['celula'].unique(),
-                                                   default=df['celula'].unique())
-            with col_f3:
-                prioridad_filtro = st.multiselect("Filtrar por Prioridad",
-                                                 options=df['prioridad'].unique(),
-                                                 default=df['prioridad'].unique())
-            
-            # Aplicar filtros
-            df_filtrado = df[
-                (df['estado'].isin(estado_filtro)) &
-                (df['celula'].isin(celula_filtro_ver)) &
-                (df['prioridad'].isin(prioridad_filtro))
+        if not df_terminadas.empty:
+            df_terminadas = df_terminadas.nlargest(10, 'horas_restantes')[
+                ['nombre', 'desarrolladores', 'horas_mes', 'horas_optimizadas', 'horas_restantes', 'descripcion']
             ]
-            
-            # Mostrar tareas
-            for _, row in df_filtrado.iterrows():
-                with st.expander(f"{row['prioridad']} | {row['titulo']} - {row['estado']}"):
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.write(f"**👤 Desarrollador:** {row['desarrollador']}")
-                        st.write(f"**🏢 Célula:** {row['celula']}")
-                        st.write(f"**📊 Estado:** {row['estado']}")
-                    
-                    with col2:
-                        st.write(f"**📅 Fecha Creación:** {row['fecha_creacion']}")
-                        if row['fecha_inicio']:
-                            st.write(f"**📅 Fecha Inicio:** {row['fecha_inicio']}")
-                        if row['fecha_finalizacion']:
-                            st.write(f"**🏁 Fecha Finalización:** {row['fecha_finalizacion']}")
-                    
-                    with col3:
-                        if row['horas_operativas']:
-                            st.write(f"**⏱️ Horas Operativas:** {row['horas_operativas']}h")
-                        if row['horas_optimizadas']:
-                            st.write(f"**⚡ Horas Optimizadas:** {row['horas_optimizadas']}h")
-                        if row['horas_operativas'] and row['horas_optimizadas']:
-                            ahorro = row['horas_operativas'] - row['horas_optimizadas']
-                            st.write(f"**💾 Ahorro:** {ahorro:.1f}h")
-                    
-                    if row['descripcion']:
-                        st.write(f"**📝 Descripción:** {row['descripcion']}")
+            df_terminadas.columns = ['Desarrollo', 'Equipo', 'Horas Antes', 'Horas Después', 'Ahorro', 'Descripción']
+            st.dataframe(df_terminadas, use_container_width=True, height=400)
         else:
-            st.info("📭 No hay tareas registradas.")
-    
-    # Tab 3: Editar/Eliminar
-    with tab3:
-        st.subheader("Editar o Eliminar Tarea")
-        
-        df = obtener_tareas()
-        
-        if not df.empty:
-            # Selector de tarea
-            tareas_opciones = {f"{row['id']} - {row['titulo']}": row['id'] for _, row in df.iterrows()}
-            tarea_seleccionada = st.selectbox("Selecciona una tarea", list(tareas_opciones.keys()))
-            
-            if tarea_seleccionada:
-                id_tarea = tareas_opciones[tarea_seleccionada]
-                tarea = df[df['id'] == id_tarea].iloc[0]
-                
-                with st.form("editar_tarea_form"):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        titulo_edit = st.text_input("📌 Título", value=tarea['titulo'])
-                        desarrollador_edit = st.text_input("👤 Desarrollador", value=tarea['desarrollador'])
-                        estado_edit = st.selectbox("📊 Estado", ["Pendiente", "En Proceso", "Completada"],
-                                                  index=["Pendiente", "En Proceso", "Completada"].index(tarea['estado']))
-                        
-                        # Fecha de inicio
-                        fecha_inicio_actual = None
-                        if tarea['fecha_inicio']:
-                            try:
-                                fecha_inicio_actual = datetime.strptime(tarea['fecha_inicio'], "%Y-%m-%d").date()
-                            except:
-                                pass
-                        fecha_inicio_edit = st.date_input("📅 Fecha de Inicio", value=fecha_inicio_actual)
-                        
-                        horas_op_edit = st.number_input("⏱️ Horas Operativas", 
-                                                       min_value=0.0, step=0.5,
-                                                       value=float(tarea['horas_operativas']) if tarea['horas_operativas'] else 0.0)
-                    
-                    with col2:
-                        descripcion_edit = st.text_area("📝 Descripción", value=tarea['descripcion'] if tarea['descripcion'] else "")
-                        celula_edit = st.text_input("🏢 Célula", value=tarea['celula'])
-                        prioridad_edit = st.selectbox("🚦 Prioridad", ["🔴 URGENTE", "🟡 MEDIA", "🟢 BAJA"],
-                                                     index=["🔴 URGENTE", "🟡 MEDIA", "🟢 BAJA"].index(tarea['prioridad']))
-                        
-                        # Fecha de finalización
-                        fecha_fin_actual = None
-                        if tarea['fecha_finalizacion']:
-                            try:
-                                fecha_fin_actual = datetime.strptime(tarea['fecha_finalizacion'], "%Y-%m-%d").date()
-                            except:
-                                pass
-                        fecha_fin_edit = st.date_input("🏁 Fecha de Finalización", value=fecha_fin_actual)
-                        
-                        horas_opt_edit = st.number_input("⚡ Horas Optimizadas",
-                                                        min_value=0.0, step=0.5,
-                                                        value=float(tarea['horas_optimizadas']) if tarea['horas_optimizadas'] else 0.0)
-                    
-                    col_btn1, col_btn2 = st.columns(2)
-                    
-                    with col_btn1:
-                        actualizar = st.form_submit_button("💾 Actualizar Tarea", use_container_width=True)
-                    with col_btn2:
-                        eliminar = st.form_submit_button("🗑️ Eliminar Tarea", use_container_width=True, type="secondary")
-                    
-                    if actualizar:
-                        fecha_inicio_str = fecha_inicio_edit.strftime("%Y-%m-%d") if fecha_inicio_edit else None
-                        fecha_fin_str = fecha_fin_edit.strftime("%Y-%m-%d") if fecha_fin_edit else None
-                        
-                        actualizar_tarea(id_tarea, titulo_edit, descripcion_edit, desarrollador_edit,
-                                       celula_edit, estado_edit, prioridad_edit, fecha_inicio_str,
-                                       fecha_fin_str, horas_op_edit if horas_op_edit > 0 else None,
-                                       horas_opt_edit if horas_opt_edit > 0 else None)
-                        st.success("✅ Tarea actualizada exitosamente!")
-                        st.rerun()
-                    
-                    if eliminar:
-                        eliminar_tarea(id_tarea)
-                        st.success("🗑️ Tarea eliminada exitosamente!")
-                        st.rerun()
-        else:
-            st.info("📭 No hay tareas para editar.")
+            st.info("Aún no hay tareas terminadas con datos de optimización")
 
-# ============================================
-# ANÁLISIS Y GRÁFICOS
-# ============================================
-elif menu == "Análisis y Gráficos":
-    st.header("📈 Análisis y Gráficos")
+# -------------------------
+# GESTIÓN DE TAREAS
+# -------------------------
+
+elif menu == "📝 Gestión de Tareas":
+    st.markdown('<h1 class="main-header">📝 Gestión de Tareas</h1>', unsafe_allow_html=True)
     
     df = obtener_tareas()
     
-    if not df.empty and df['horas_operativas'].notna().any():
-        # Convertir fechas
-        df['fecha_creacion'] = pd.to_datetime(df['fecha_creacion'])
-        df['mes'] = df['fecha_creacion'].dt.to_period('M').astype(str)
-        
-        # Filtros
+    if df.empty:
+        st.info("📭 No hay tareas registradas.")
+    else:
+        # Filtros avanzados
         st.subheader("🔍 Filtros")
-        col_f1, col_f2 = st.columns(2)
+        
+        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
         
         with col_f1:
-            celulas_disponibles = ["Todas"] + list(df['celula'].unique())
-            celula_seleccionada = st.selectbox("Filtrar por Célula", celulas_disponibles)
+            estados_unicos = ['Todos'] + sorted(df['estado'].unique().tolist())
+            filtro_estado = st.selectbox("Estado", estados_unicos)
         
         with col_f2:
-            desarrolladores_disponibles = ["Todos"] + list(df['desarrollador'].unique())
-            desarrollador_seleccionado = st.selectbox("Filtrar por Desarrollador", desarrolladores_disponibles)
+            sprints_unicos = ['Todos'] + sorted(df['sprint'].dropna().unique().tolist())
+            filtro_sprint = st.selectbox("Sprint", sprints_unicos)
+        
+        with col_f3:
+            categorias_unicas = ['Todos'] + sorted(df['categoria'].dropna().unique().tolist())
+            filtro_categoria = st.selectbox("Categoría", categorias_unicas)
+        
+        with col_f4:
+            celulas_unicas = ['Todos'] + sorted(df['celula'].dropna().unique().tolist())
+            filtro_celula = st.selectbox("Célula", celulas_unicas)
         
         # Aplicar filtros
         df_filtrado = df.copy()
-        if celula_seleccionada != "Todas":
-            df_filtrado = df_filtrado[df_filtrado['celula'] == celula_seleccionada]
-        if desarrollador_seleccionado != "Todos":
-            df_filtrado = df_filtrado[df_filtrado['desarrollador'] == desarrollador_seleccionado]
         
-        # Filtrar solo datos con horas operativas y optimizadas
-        df_filtrado = df_filtrado.dropna(subset=['horas_operativas', 'horas_optimizadas'])
+        if filtro_estado != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['estado'] == filtro_estado]
         
-        if not df_filtrado.empty:
-            st.markdown("---")
-            st.subheader("📊 Comparación: Horas Operativas vs Horas Optimizadas por Mes")
+        if filtro_sprint != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['sprint'] == filtro_sprint]
+        
+        if filtro_categoria != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['categoria'] == filtro_categoria]
+        
+        if filtro_celula != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['celula'] == filtro_celula]
+        
+        st.markdown(f"**Mostrando {len(df_filtrado)} de {len(df)} tareas**")
+        
+        st.divider()
+        
+        # Tabla con filtros por columna usando columnas personalizadas
+        st.subheader("📋 Lista de Tareas")
+        
+        # Preparar dataframe para mostrar
+        df_display = df_filtrado[[
+            'id', 'nombre', 'desarrolladores', 'estado', 'sprint', 
+            'horas_mes', 'horas_optimizadas', 'horas_restantes', 
+            'categoria', 'celula', 'puntos', 'analista', 'fecha'
+        ]].copy()
+        
+        # Renombrar columnas para mejor visualización
+        df_display.columns = [
+            'ID', 'Nombre', 'Equipo', 'Estado', 'Sprint',
+            'Horas/Mes', 'Horas Opt.', 'Ahorro', 
+            'Categoría', 'Célula', 'Puntos', 'Analista', 'Fecha'
+        ]
+        
+        # Mostrar tabla con capacidad de selección
+        st.dataframe(
+            df_display,
+            use_container_width=True,
+            height=400
+        )
+        
+        st.divider()
+        
+        # Acciones sobre tareas
+        st.subheader("⚡ Acciones Rápidas")
+        
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "🔄 Cambiar Estado", 
+            "👥 Reasignar Equipo", 
+            "✅ Finalizar Tarea",
+            "🗑️ Eliminar Tareas"
+        ])
+        
+        # TAB 1: Cambiar Estado
+        with tab1:
+            col_e1, col_e2, col_e3 = st.columns([2, 2, 1])
             
-            # Agrupar por mes
-            df_agrupado = df_filtrado.groupby('mes').agg({
-                'horas_operativas': 'sum',
-                'horas_optimizadas': 'sum'
-            }).reset_index()
+            with col_e1:
+                id_estado = st.number_input(
+                    "ID de la tarea",
+                    min_value=1,
+                    step=1,
+                    key="id_estado"
+                )
             
-            # Ordenar por mes
-            df_agrupado = df_agrupado.sort_values('mes')
+            with col_e2:
+                nuevo_estado = st.selectbox(
+                    "Nuevo estado",
+                    ["Backlog", "En progreso", "Terminado"],
+                    key="nuevo_estado"
+                )
             
-            # Crear gráfico de barras apiladas
-            fig = go.Figure()
+            with col_e3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🔄 Actualizar", use_container_width=True):
+                    if id_estado in df['id'].values:
+                        if actualizar_estado(id_estado, nuevo_estado):
+                            st.success(f"✅ Estado actualizado a '{nuevo_estado}'")
+                            st.rerun()
+                    else:
+                        st.error("❌ ID no encontrado")
+        
+        # TAB 2: Reasignar Equipo
+        with tab2:
+            col_r1, col_r2, col_r3 = st.columns([1, 2, 1])
             
-            # Agregar barras de Horas Operativas
-            fig.add_trace(go.Bar(
-                name='Horas Operativas (Manual)',
-                x=df_agrupado['mes'],
-                y=df_agrupado['horas_operativas'],
-                marker_color='#FF6B6B',
-                text=df_agrupado['horas_operativas'].round(1),
-                textposition='inside',
-                textfont=dict(color='white', size=12)
-            ))
+            with col_r1:
+                id_reasignar = st.number_input(
+                    "ID de la tarea",
+                    min_value=1,
+                    step=1,
+                    key="id_reasignar"
+                )
             
-            # Agregar barras de Horas Optimizadas
-            fig.add_trace(go.Bar(
-                name='Horas Optimizadas (Después)',
-                x=df_agrupado['mes'],
-                y=df_agrupado['horas_optimizadas'],
-                marker_color='#4ECDC4',
-                text=df_agrupado['horas_optimizadas'].round(1),
-                textposition='inside',
-                textfont=dict(color='white', size=12)
-            ))
+            with col_r2:
+                devs_disponibles = obtener_desarrolladores()
+                if not devs_disponibles.empty:
+                    nuevos_devs = st.multiselect(
+                        "Nuevo equipo",
+                        devs_disponibles['nombre'].tolist(),
+                        key="nuevos_devs"
+                    )
+                else:
+                    st.warning("No hay desarrolladores disponibles")
+                    nuevos_devs = []
             
-            # Configuración del diseño
-            fig.update_layout(
-                barmode='group',
-                title='Comparación de Horas por Mes',
-                xaxis_title='Mes',
-                yaxis_title='Horas',
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1
-                ),
-                height=500,
-                hovermode='x unified'
+            with col_r3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("👥 Reasignar", use_container_width=True):
+                    if id_reasignar in df['id'].values:
+                        if nuevos_devs:
+                            if reasignar_desarrolladores(id_reasignar, nuevos_devs):
+                                st.success("✅ Equipo reasignado")
+                                st.rerun()
+                        else:
+                            st.error("❌ Debes seleccionar al menos un desarrollador")
+                    else:
+                        st.error("❌ ID no encontrado")
+        
+        # TAB 3: Finalizar Tarea
+        with tab3:
+            st.markdown("**Complete los datos de finalización:**")
+            
+            col_f1, col_f2 = st.columns([1, 2])
+            
+            with col_f1:
+                id_finalizar = st.number_input(
+                    "ID de la tarea",
+                    min_value=1,
+                    step=1,
+                    key="id_finalizar"
+                )
+                
+                # Obtener horas originales de la tarea
+                tarea_actual = df[df['id'] == id_finalizar]
+                max_horas = int(tarea_actual['horas_mes'].values[0]) if not tarea_actual.empty else 1000
+                
+                horas_optimizadas = st.number_input(
+                    "Horas Optimizadas/Mes",
+                    min_value=0,
+                    max_value=max_horas,
+                    value=0,
+                    help="Horas que toma ahora la tarea después de la automatización"
+                )
+            
+            with col_f2:
+                descripcion_auto = st.text_area(
+                    "Descripción de la Automatización",
+                    placeholder="Describe cómo se automatizó o mejoró el proceso...",
+                    height=150
+                )
+                
+                if st.button("✅ Finalizar Tarea", type="primary", use_container_width=True):
+                    if id_finalizar in df['id'].values:
+                        if descripcion_auto.strip():
+                            if finalizar_tarea(id_finalizar, horas_optimizadas, descripcion_auto):
+                                ahorro = max_horas - horas_optimizadas
+                                st.success(f"✅ Tarea finalizada! Ahorro: {ahorro} horas/mes")
+                                st.balloons()
+                                st.rerun()
+                        else:
+                            st.error("❌ La descripción es obligatoria")
+                    else:
+                        st.error("❌ ID no encontrado")
+        
+        # TAB 4: Eliminar Tareas
+        with tab4:
+            st.markdown("### 🗑️ Eliminación Masiva de Tareas")
+            st.warning("⚠️ Esta acción no se puede deshacer. Asegúrate de seleccionar las tareas correctas.")
+            
+            # Crear lista de tareas para seleccionar
+            opciones_tareas = df_filtrado.apply(
+                lambda row: f"ID {row['id']} - {row['nombre']} ({row['estado']})", 
+                axis=1
+            ).tolist()
+            
+            tareas_ids = df_filtrado['id'].tolist()
+            
+            # Diccionario para mapear texto a ID
+            opciones_dict = dict(zip(opciones_tareas, tareas_ids))
+            
+            tareas_seleccionadas = st.multiselect(
+                "Selecciona las tareas a eliminar:",
+                opciones_tareas,
+                help="Puedes seleccionar múltiples tareas"
             )
             
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Tabla resumen
-            st.markdown("---")
-            st.subheader("📋 Resumen por Mes")
-            
-            df_agrupado['ahorro_horas'] = df_agrupado['horas_operativas'] - df_agrupado['horas_optimizadas']
-            df_agrupado['porcentaje_optimizado'] = ((df_agrupado['horas_operativas'] - df_agrupado['horas_optimizadas']) / df_agrupado['horas_operativas'] * 100).round(1)
-            
-            df_agrupado_display = df_agrupado.copy()
-            df_agrupado_display.columns = ['Mes', 'Horas Operativas', 'Horas Optimizadas', 'Ahorro (h)', 'Optimización (%)']
-            
-            st.dataframe(df_agrupado_display, use_container_width=True)
-            
-            # Métricas generales
-            st.markdown("---")
-            st.subheader("📊 Métricas Generales")
-            
-            col1, col2, col3, col4 = st.columns(4)
+            if tareas_seleccionadas:
+                ids_a_eliminar = [opciones_dict[tarea] for tarea in tareas_seleccionadas]
+                
+                col_del1, col_del2 = st.columns([3, 1])
+                
+                with col_del1:
+                    st.error(f"⚠️ Vas a eliminar {len(ids_a_eliminar)} tarea(s)")
+                
+                with col_del2:
+                    if st.button("🗑️ Confirmar Eliminación", type="primary", use_container_width=True):
+                        if eliminar_tareas_multiples(ids_a_eliminar):
+                            st.success(f"✅ {len(ids_a_eliminar)} tarea(s) eliminada(s)")
+                            st.rerun()
+
+# -------------------------
+# NUEVA TAREA
+# -------------------------
+
+elif menu == "➕ Nueva Tarea":
+    st.markdown('<h1 class="main-header">➕ Crear Nueva Tarea</h1>', unsafe_allow_html=True)
+    
+    devs_df = obtener_desarrolladores()
+    
+    if devs_df.empty:
+        st.warning("⚠️ Primero debes agregar desarrolladores en la sección 'Desarrolladores'")
+    else:
+        with st.form("nueva_tarea", clear_on_submit=True):
+            col1, col2 = st.columns(2)
             
             with col1:
-                total_op = df_filtrado['horas_operativas'].sum()
-                st.metric("⏱️ Total Horas Operativas", f"{total_op:.1f}h")
+                st.markdown("### 📋 Información Básica")
+                nombre = st.text_input(
+                    "Nombre del Desarrollo*",
+                    placeholder="Ej: Automatización de reportes mensuales"
+                )
+                
+                prioridad = st.selectbox(
+                    "Prioridad",
+                    ["URGENTE","MEDIA","BAJA"]
+                )
+
+                celula = st.text_input(
+                    "Célula*",
+                    placeholder="Ej: Backend, Frontend, Data"
+                )
+                
+                analista = st.text_input(
+                    "Analista*",
+                    placeholder="Nombre del analista responsable"
+                )
+                
+                categoria = st.selectbox(
+                    "Categoría*",
+                    ["PROCESO", "ESTRATEGICA"]
+                )
+                
+                devs_sel = st.multiselect(
+                    "Equipo de Desarrollo*",
+                    devs_df['nombre'].tolist(),
+                    help="Selecciona uno o más desarrolladores"
+                )
             
             with col2:
-                total_opt = df_filtrado['horas_optimizadas'].sum()
-                st.metric("⚡ Total Horas Optimizadas", f"{total_opt:.1f}h")
+                st.markdown("### 📊 Planificación")
+                horas = st.number_input(
+                    "Horas/Mes*",
+                    min_value=1,
+                    max_value=1000,
+                    value=10,
+                    help="Horas operativas mensuales que consume esta tarea"
+                )
+                
+                puntos = st.number_input(
+                    "Puntos de Desarrollo*",
+                    min_value=1,
+                    max_value=20,
+                    value=5
+                )
+                
+                sprint = st.text_input(
+                    "Sprint*",
+                    placeholder="Ej: Sprint 1, Sprint 2024-Q1"
+                )
+                
+                frecuencia = st.text_input(
+                    "Frecuencia de Ejecución*",
+                    placeholder="Ej: Diaria, Semanal, Mensual"
+                )
             
-            with col3:
-                ahorro_total = total_op - total_opt
-                st.metric("💾 Ahorro Total", f"{ahorro_total:.1f}h")
+            st.markdown("---")
             
-            with col4:
-                porcentaje_general = (ahorro_total / total_op * 100) if total_op > 0 else 0
-                st.metric("📈 Optimización General", f"{porcentaje_general:.1f}%")
-        else:
-            st.warning("⚠️ No hay datos con horas operativas y optimizadas para los filtros seleccionados.")
+            submit = st.form_submit_button(
+                "✅ Crear Tarea",
+                use_container_width=True,
+                type="primary"
+            )
+            
+            if submit:
+                # Validaciones
+                if not nombre or not celula or not analista or not sprint or not frecuencia:
+                    st.error("❌ Todos los campos marcados con * son obligatorios")
+                elif not devs_sel:
+                    st.error("❌ Debes seleccionar al menos un desarrollador")
+                else:
+                    datos = (
+                        nombre,
+                        celula,
+                        horas,
+                        0,  # horas_optimizadas
+                        "",  # descripcion
+                        "Backlog",  # estado inicial
+                        datetime.now().strftime("%Y-%m-%d"),
+                        puntos,
+                        analista,
+                        categoria,
+                        frecuencia,
+                        sprint
+                    )
+                    
+                    if insertar_tarea(datos, devs_sel):
+                        st.success("✅ Tarea creada exitosamente!")
+                        st.balloons()
+                        st.rerun()
+
+# -------------------------
+# DESARROLLADORES
+# -------------------------
+
+elif menu == "👨‍💻 Desarrolladores":
+    st.markdown('<h1 class="main-header">👨‍💻 Gestión de Desarrolladores</h1>', unsafe_allow_html=True)
+    
+    # Agregar nuevo desarrollador
+    st.subheader("➕ Agregar Desarrollador")
+    
+    col_add1, col_add2 = st.columns([3, 1])
+    
+    with col_add1:
+        nuevo_dev = st.text_input(
+            "Nombre completo del desarrollador",
+            placeholder="Ej: Juan Pérez"
+        )
+    
+    with col_add2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("✅ Agregar", use_container_width=True):
+            if nuevo_dev.strip():
+                if agregar_desarrollador(nuevo_dev):
+                    st.success(f"✅ {nuevo_dev} agregado exitosamente")
+                    st.rerun()
+            else:
+                st.error("❌ El nombre no puede estar vacío")
+    
+    st.divider()
+    
+    # Lista de desarrolladores
+    df_devs = obtener_desarrolladores()
+    
+    st.subheader(f"📋 Desarrolladores Registrados ({len(df_devs)})")
+    
+    if df_devs.empty:
+        st.info("No hay desarrolladores registrados. Agrega uno arriba.")
     else:
-        st.info("📭 No hay suficientes datos para generar gráficos. Agrega tareas con horas operativas y optimizadas.")
+        # Obtener estadísticas de cada desarrollador
+        df_tareas = obtener_tareas()
+        
+        for _, dev in df_devs.iterrows():
+            with st.expander(f"👤 {dev['nombre']}", expanded=False):
+                # Contar tareas donde aparece este desarrollador
+                tareas_asignadas = 0
+                if not df_tareas.empty:
+                    tareas_asignadas = df_tareas['desarrolladores'].str.contains(
+                        dev['nombre'], 
+                        na=False
+                    ).sum()
+                
+                col_dev1, col_dev2, col_dev3 = st.columns(3)
+                
+                with col_dev1:
+                    st.metric("Tareas Asignadas", tareas_asignadas)
+                
+                with col_dev2:
+                    st.metric("ID", dev['id'])
+                
+                with col_dev3:
+                    if st.button("🗑️ Eliminar", key=f"del_dev_{dev['id']}"):
+                        if tareas_asignadas > 0:
+                            st.error(f"❌ No se puede eliminar. {dev['nombre']} tiene {tareas_asignadas} tarea(s) asignada(s)")
+                        else:
+                            if eliminar_desarrollador(dev['id']):
+                                st.success(f"✅ {dev['nombre']} eliminado")
+                                st.rerun()
+
+# -------------------------
+# IMPORTAR EXCEL
+# -------------------------
+
+elif menu == "📥 Importar Excel":
+    st.markdown('<h1 class="main-header">📥 Importar Tareas desde Excel</h1>', unsafe_allow_html=True)
+    
+    # Descargar plantilla
+    st.subheader("📄 Descargar Plantilla")
+    st.markdown("""
+    Descarga la plantilla de Excel con el formato correcto para importar tareas masivamente.
+    La plantilla incluye un ejemplo de cómo llenarla.
+    """)
+    
+    col_plant1, col_plant2 = st.columns([3, 1])
+    
+    with col_plant1:
+        st.markdown("**Columnas requeridas:**")
+        st.code("""
+nombre
+celula
+horas_mes
+puntos
+analista
+categoria
+frecuencia
+sprint
+desarrolladores (separados por coma)
+        """)
+    
+    with col_plant2:
+        plantilla_df = crear_plantilla_excel()
+        buffer_plantilla = io.BytesIO()
+        plantilla_df.to_excel(buffer_plantilla, index=False, sheet_name='Plantilla')
+        
+        st.download_button(
+            label="⬇️ Descargar Plantilla",
+            data=buffer_plantilla.getvalue(),
+            file_name="plantilla_backlog.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+    
+    st.divider()
+    
+    # Importar archivo
+    st.subheader("📤 Importar Tareas")
+    
+    file = st.file_uploader(
+        "Selecciona un archivo Excel",
+        type=["xlsx", "xls"],
+        help="El archivo debe tener las columnas especificadas en la plantilla"
+    )
+    
+    if file:
+        try:
+            df_excel = pd.read_excel(file)
+            
+            # Validar columnas requeridas
+            columnas_requeridas = [
+                'nombre', 'celula', 'horas_mes', 'puntos',
+                'analista', 'categoria', 'frecuencia', 'sprint', 'desarrolladores'
+            ]
+            
+            columnas_faltantes = [col for col in columnas_requeridas if col not in df_excel.columns]
+            
+            if columnas_faltantes:
+                st.error(f"❌ Faltan las siguientes columnas: {', '.join(columnas_faltantes)}")
+                st.info("💡 Descarga la plantilla para ver el formato correcto")
+            else:
+                st.success(f"✅ Archivo válido. Se encontraron {len(df_excel)} tareas")
+                
+                # Vista previa
+                st.markdown("**Vista previa de los datos:**")
+                st.dataframe(df_excel.head(10), use_container_width=True)
+                
+                if st.button("📥 Importar Todas las Tareas", type="primary"):
+                    contador = 0
+                    errores = []
+                    
+                    for idx, r in df_excel.iterrows():
+                        try:
+                            # Procesar desarrolladores
+                            devs = [x.strip() for x in str(r["desarrolladores"]).split(",")]
+                            
+                            datos = (
+                                r["nombre"],
+                                r["celula"],
+                                int(r["horas_mes"]),
+                                0,  # horas_optimizadas
+                                "",  # descripcion
+                                "Backlog",  # estado inicial
+                                datetime.now().strftime("%Y-%m-%d"),
+                                int(r["puntos"]),
+                                r["analista"],
+                                r["categoria"],
+                                r["frecuencia"],
+                                r["sprint"]
+                            )
+                            
+                            if insertar_tarea(datos, devs):
+                                contador += 1
+                        except Exception as e:
+                            errores.append(f"Fila {idx + 2}: {str(e)}")
+                    
+                    if contador > 0:
+                        st.success(f"✅ {contador} tareas importadas exitosamente!")
+                        st.balloons()
+                    
+                    if errores:
+                        st.warning(f"⚠️ {len(errores)} errores encontrados:")
+                        for error in errores[:5]:
+                            st.text(error)
+                    
+                    st.rerun()
+                    
+        except Exception as e:
+            st.error(f"❌ Error al leer el archivo: {str(e)}")
+            st.info("💡 Asegúrate de usar la plantilla correcta")
+
+# -------------------------
+# EXPORTAR EXCEL
+# -------------------------
+
+elif menu == "📤 Exportar Excel":
+    st.markdown('<h1 class="main-header">📤 Exportar Backlog</h1>', unsafe_allow_html=True)
+    
+    df = obtener_tareas()
+    
+    if df.empty:
+        st.info("📭 No hay tareas para exportar")
+    else:
+        st.subheader(f"📊 Vista Previa ({len(df)} tareas)")
+        
+        # Mostrar vista previa
+        st.dataframe(df, use_container_width=True, height=400)
+        
+        st.divider()
+        
+        # Opciones de exportación
+        st.subheader("⬇️ Descargar")
+        
+        col_exp1, col_exp2, col_exp3 = st.columns(3)
+        
+        with col_exp1:
+            st.metric("Total de Tareas", len(df))
+        
+        with col_exp2:
+            # Exportar a Excel
+            buffer_excel = io.BytesIO()
+            df.to_excel(buffer_excel, index=False, sheet_name='Backlog')
+            
+            st.download_button(
+                label="📥 Descargar Excel",
+                data=buffer_excel.getvalue(),
+                file_name=f"backlog_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        
+        with col_exp3:
+            # Exportar a CSV
+            csv = df.to_csv(index=False)
+            
+            st.download_button(
+                label="📥 Descargar CSV",
+                data=csv,
+                file_name=f"backlog_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
 
 # Footer
 st.markdown("---")
 st.markdown(
-    """
-    <div style='text-align: center; color: #666;'>
-        <p>Sistema de Gestión de Tareas v2.0 | Desarrollado con ❤️ usando Streamlit</p>
-    </div>
-    """,
+    "<div style='text-align: center; color: #666;'>Backlog de Desarrollos v2.0 con Supabase | "
+    + datetime.now().strftime('%d/%m/%Y %H:%M') + "</div>",
     unsafe_allow_html=True
 )
