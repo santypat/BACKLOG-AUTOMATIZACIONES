@@ -149,35 +149,49 @@ def obtener_dev_id(nombre):
 def insertar_tarea(datos, devs):
     """Inserta una nueva tarea con sus desarrolladores asignados"""
     try:
-        # Insertar desarrollo
+
         r = supabase.table("desarrollos").insert({
-            "prioridad": prioridad,
+
             "nombre": datos[0],
-            "celula": datos[1],
-            "horas_mes": datos[2],
-            "horas_optimizadas": datos[3],
-            "descripcion": datos[4],
-            "estado": datos[5],
-            "fecha": datos[6],
-            "puntos": datos[7],
-            "analista": datos[8],
-            "categoria": datos[9],
-            "frecuencia": datos[10],
-            "sprint": datos[11]
+            "prioridad": datos[1],
+            "descripcion_desarrollo": datos[2],
+            "celula": datos[3],
+            "horas_mes": datos[4],
+            "horas_optimizadas": datos[5],
+            "descripcion": datos[6],
+            "estado": datos[7],
+            "fecha": datos[8],
+            "puntos": datos[9],
+            "analista": datos[10],
+            "categoria": datos[11],
+            "frecuencia": datos[12],
+            "sprint": datos[13],
+            "fecha_inicio": None,
+            "fecha_fin": None
+
         }).execute()
-        
+
         desarrollo_id = r.data[0]["id"]
-        
-        # Insertar relaciones con desarrolladores
+
+        # Insertar desarrolladores
         for dev in devs:
-            dev_id = obtener_dev_id(dev)
-            if dev_id:
+
+            dev_data = supabase.table("desarrolladores")\
+                .select("id")\
+                .eq("nombre", dev)\
+                .execute()
+
+            if dev_data.data:
+
+                dev_id = dev_data.data[0]["id"]
+
                 supabase.table("desarrollo_dev").insert({
                     "desarrollo_id": desarrollo_id,
                     "dev_id": dev_id
                 }).execute()
-        
+
         return True
+
     except Exception as e:
         st.error(f"Error al insertar tarea: {e}")
         return False
@@ -384,9 +398,13 @@ def crear_plantilla_excel():
     data = {
         "nombre": ["Ejemplo: Automatización de reportes"],
         "prioridad": ["MEDIA"],
-        "descripcion_desarrollo": ["Automatiza la generación del reporte mensual"],
+        "descripcion": ["Automatiza la generación del reporte mensual"],
         "celula": ["Backend"],
         "horas_mes": [40],
+        "horas_optimizadas": [20],
+        "estado": ["Pendiente"],
+        "fecha_inicio": ["2026-01-01"],
+        "fecha_fin": ["2026-01-15"],
         "puntos": [8],
         "analista": ["María García"],
         "categoria": ["PROCESO"],
@@ -398,21 +416,6 @@ def crear_plantilla_excel():
     df = pd.DataFrame(data)
 
     return df
-    
-    # Agregar fila de ejemplo
-    plantilla.loc[0] = [
-        'Ejemplo: Automatización de reportes',
-        'Backend',
-        40,
-        8,
-        'María García',
-        'PROCESO',
-        'Mensual',
-        'Sprint 1',
-        'Juan Pérez, Carlos López'
-    ]
-    
-    return plantilla
 
 # -------------------------
 # SIDEBAR
@@ -987,7 +990,7 @@ elif menu == "📝 Gestión de Tareas":
 
                         "nombre": nombre,
                         "celula": celula,
-                        "prioridad": prioridad,
+                        "prioridad": "prioridad": datos[12],
                         "horas_mes": horas_mes,
                         "puntos": puntos,
                         "analista": analista,
