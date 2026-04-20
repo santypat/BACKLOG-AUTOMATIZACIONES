@@ -380,18 +380,24 @@ def eliminar_tareas_multiples(ids):
         return False
 
 def crear_plantilla_excel():
-    """Crea un archivo Excel de plantilla"""
-    plantilla = pd.DataFrame(columns=[
-        'nombre',
-        'celula',
-        'horas_mes',
-        'puntos',
-        'analista',
-        'categoria',
-        'frecuencia',
-        'sprint',
-        'desarrolladores'
-    ])
+
+    data = {
+        "nombre": ["Ejemplo: Automatización de reportes"],
+        "prioridad": ["MEDIA"],
+        "descripcion_desarrollo": ["Automatiza la generación del reporte mensual"],
+        "celula": ["Backend"],
+        "horas_mes": [40],
+        "puntos": [8],
+        "analista": ["María García"],
+        "categoria": ["PROCESO"],
+        "frecuencia": ["Mensual"],
+        "sprint": ["Sprint 1"],
+        "desarrolladores": ["Juan Pérez, Carlos López"]
+    }
+
+    df = pd.DataFrame(data)
+
+    return df
     
     # Agregar fila de ejemplo
     plantilla.loc[0] = [
