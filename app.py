@@ -518,7 +518,7 @@ elif menu == "📝 Gestión de Tareas":
         # Filtros avanzados
         st.subheader("🔍 Filtros")
         
-        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+        col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
         
         with col_f1:
             estados_unicos = ['Todos'] + sorted(df['estado'].unique().tolist())
@@ -536,8 +536,20 @@ elif menu == "📝 Gestión de Tareas":
             celulas_unicas = ['Todos'] + sorted(df['celula'].dropna().unique().tolist())
             filtro_celula = st.selectbox("Célula", celulas_unicas)
         
+        with col_f5:
+
+            devs_unicos = ['Todos'] + sorted(df['desarrolladores'].dropna().unique().tolist())
+
+            filtro_dev = st.selectbox(
+                "Desarrollador",
+                devs_unicos
+            )
+                
         # Aplicar filtros
         df_filtrado = df.copy()
+
+        if filtro_dev != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['desarrolladores'].str.contains(filtro_dev)]
         
         if filtro_estado != 'Todos':
             df_filtrado = df_filtrado[df_filtrado['estado'] == filtro_estado]
@@ -607,10 +619,10 @@ elif menu == "📝 Gestión de Tareas":
         st.subheader("⚡ Acciones Rápidas")
         
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "🔄 Cambiar Estado", 
-            "👥 Reasignar Equipo", 
-            "🚦 Reasignar Prioridad",
+            "🔄 Cambiar Estado",
+            "👥 Reasignar Equipo",
             "✅ Finalizar Tarea",
+            "✏️ Editar Tarea",
             "🗑️ Eliminar Tareas"
         ])
         
@@ -760,7 +772,58 @@ elif menu == "📝 Gestión de Tareas":
                     else:
                         st.error("❌ ID no encontrado")
         
-        # TAB 4: Eliminar Tareas
+        # TAB 4: EDITAR TAREA
+        with tab4:
+
+            st.markdown("### ✏️ Editar Información de la Tarea")
+
+            id_editar = st.number_input(
+                "ID de la tarea",
+                min_value=1,
+                step=1,
+                key="id_editar"
+            )
+
+            tarea = df[df["id"] == id_editar]
+
+            if not tarea.empty:
+
+                tarea = tarea.iloc[0]
+
+                nuevo_nombre = st.text_input("Nombre", value=tarea["nombre"])
+                nueva_prioridad = st.selectbox(
+                    "Prioridad",
+                    ["URGENTE", "MEDIA", "BAJA"],
+                    index=["URGENTE","MEDIA","BAJA"].index(tarea["prioridad"]) if tarea["prioridad"] in ["URGENTE","MEDIA","BAJA"] else 1
+                )
+
+                nueva_celula = st.text_input("Célula", value=tarea["celula"])
+
+                nuevas_horas = st.number_input(
+                    "Horas Mes",
+                    min_value=0,
+                    value=int(tarea["horas_mes"])
+                )
+
+                nueva_desc = st.text_area(
+                    "Descripción del Desarrollo",
+                    value=tarea.get("descripcion_desarrollo","")
+                )
+
+                if st.button("💾 Guardar Cambios"):
+
+                    supabase.table("desarrollos").update({
+                        "nombre": nuevo_nombre,
+                        "prioridad": nueva_prioridad,
+                        "celula": nueva_celula,
+                        "horas_mes": nuevas_horas,
+                        "descripcion_desarrollo": nueva_desc
+                    }).eq("id", id_editar).execute()
+
+                    st.success("✅ Tarea actualizada correctamente")
+                    st.rerun()
+
+        # TAB 5: Eliminar Tareas
         with tab5:
             st.markdown("### 🗑️ Eliminación Masiva de Tareas")
             st.warning("⚠️ Esta acción no se puede deshacer. Asegúrate de seleccionar las tareas correctas.")
@@ -1039,17 +1102,18 @@ desarrolladores (separados por coma)
 
             #COLUMNAS REQUERIDAS
             columnas_requeridas = [
-            'nombre',
-            'prioridad',
-            'celula',
-            'horas_mes',
-            'puntos',
-            'analista',
-            'categoria',
-            'frecuencia',
-            'sprint',
-            'desarrolladores'
-        ]
+                    'nombre',
+                    'prioridad',
+                    'descripcion_desarrollo',
+                    'celula',
+                    'horas_mes',
+                    'puntos',
+                    'analista',
+                    'categoria',
+                    'frecuencia',
+                    'sprint',
+                    'desarrolladores'
+                ]
             
             columnas_faltantes = [col for col in columnas_requeridas if col not in df_excel.columns]
             
@@ -1075,6 +1139,7 @@ desarrolladores (separados por coma)
                             datos = (
                                 r["nombre"],
                                 r["prioridad"],
+                                r["descripcion_desarrollo"],
                                 r["celula"],
                                 int(r["horas_mes"]),
                                 0,
