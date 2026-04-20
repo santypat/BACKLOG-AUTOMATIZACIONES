@@ -986,29 +986,34 @@ elif menu == "📝 Gestión de Tareas":
 
                     devs = [x.strip() for x in desarrolladores.split(",") if x.strip()]
 
-                    supabase.table("desarrollos").update({
+                    try:
 
-                        "nombre": nombre,
-                        "celula": celula,
-                        "prioridad": "prioridad": datos[12],
-                        "horas_mes": horas_mes,
-                        "puntos": puntos,
-                        "analista": analista,
-                        "categoria": categoria,
-                        "frecuencia": frecuencia,
-                        "sprint": sprint,
-                        "descripcion_desarrollo": descripcion,
-                        "fecha_inicio": str(fecha_inicio),
-                        "fecha_fin": str(fecha_fin),
-                        "desarrolladores": ", ".join(devs)
+                        supabase.table("desarrollos").update({
 
-                    }).eq("id", id_editar).execute()
+                            "nombre": nombre,
+                            "celula": celula,
+                            "prioridad": prioridad,
+                            "horas_mes": horas_mes,
+                            "puntos": puntos,
+                            "analista": analista,
+                            "categoria": categoria,
+                            "frecuencia": frecuencia,
+                            "sprint": sprint,
+                            "descripcion_desarrollo": descripcion,
+                            "fecha_inicio": str(fecha_inicio),
+                            "fecha_fin": str(fecha_fin),
+                            "desarrolladores": ", ".join(devs)
 
-                    st.success("✅ Desarrollo actualizado correctamente")
-                    st.rerun()
+                        }).eq("id", id_editar).execute()
 
-            else:
-                st.info("Introduce un ID válido para editar la tarea")
+                        st.success("✅ Desarrollo actualizado correctamente")
+                        st.rerun()
+
+                    except Exception as e:
+                        st.error(f"❌ Error al actualizar el desarrollo: {e}")
+
+                else:
+                    st.info("Introduce un ID válido para editar la tarea")
                 
 
         # TAB 6: Eliminar Tareas
