@@ -452,14 +452,64 @@ if menu == "📊 Dashboard":
         st.info("📭 No hay tareas registradas. Crea una nueva tarea para comenzar.")
     else:
         # -------------------------
-        # MÉTRICAS PRINCIPALES
+        # 🔍 FILTROS (NUEVO)
+        # -------------------------
+        
+        st.subheader("🔍 Filtros")
+        
+        col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
+        
+        with col_f1:
+            estados_unicos = ['Todos'] + sorted(df['estado'].unique().tolist())
+            filtro_estado = st.selectbox("Estado", estados_unicos, key="dash_estado")
+        
+        with col_f2:
+            sprints_unicos = ['Todos'] + sorted(df['sprint'].dropna().unique().tolist())
+            filtro_sprint = st.selectbox("Sprint", sprints_unicos, key="dash_sprint")
+        
+        with col_f3:
+            categorias_unicas = ['Todos'] + sorted(df['categoria'].dropna().unique().tolist())
+            filtro_categoria = st.selectbox("Categoría", categorias_unicas, key="dash_categoria")
+        
+        with col_f4:
+            celulas_unicas = ['Todos'] + sorted(df['celula'].dropna().unique().tolist())
+            filtro_celula = st.selectbox("Célula", celulas_unicas, key="dash_celula")
+        
+        with col_f5:
+            devs_unicos = ['Todos'] + sorted(df['desarrolladores'].dropna().unique().tolist())
+            filtro_dev = st.selectbox("Desarrollador", devs_unicos, key="dash_dev")
+        
+        # Aplicar filtros
+        df_filtrado = df.copy()
+        
+        if filtro_dev != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['desarrolladores'].str.contains(filtro_dev, na=False)]
+        
+        if filtro_estado != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['estado'] == filtro_estado]
+        
+        if filtro_sprint != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['sprint'] == filtro_sprint]
+        
+        if filtro_categoria != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['categoria'] == filtro_categoria]
+        
+        if filtro_celula != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['celula'] == filtro_celula]
+        
+        st.markdown(f"**Mostrando {len(df_filtrado)} de {len(df)} tareas**")
+        
+        st.divider()
+        
+        # -------------------------
+        # MÉTRICAS PRINCIPALES (ACTUALIZADAS CON FILTROS)
         # -------------------------
 
         col1, col2, col3, col4 = st.columns(4)
         
-        total_tareas = len(df)
-        total_horas_mes = int(df["horas_mes"].sum())
-        total_horas_opt = int(df["horas_optimizadas"].sum())
+        total_tareas = len(df_filtrado)
+        total_horas_mes = int(df_filtrado["horas_mes"].sum())
+        total_horas_opt = int(df_filtrado["horas_optimizadas"].sum())
         ahorro_total = total_horas_mes - total_horas_opt
         
         col1.metric("📦 Total Tareas", total_tareas)
@@ -470,16 +520,15 @@ if menu == "📊 Dashboard":
         st.divider()
         
         # -------------------------
-        # GRAFICO DE HORAS POR MES
+        # GRAFICO DE HORAS POR MES (ACTUALIZADO CON FILTROS)
         # -------------------------
 
         st.subheader("📊 Impacto de Automatizaciones por Mes")
 
-        df['fecha'] = pd.to_datetime(df['fecha'])
+        df_filtrado['fecha'] = pd.to_datetime(df_filtrado['fecha'])
+        df_filtrado['mes'] = df_filtrado['fecha'].dt.to_period("M").astype(str)
 
-        df['mes'] = df['fecha'].dt.to_period("M").astype(str)
-
-        df_mes = df.groupby("mes").agg({
+        df_mes = df_filtrado.groupby("mes").agg({
             "horas_mes": "sum",
             "horas_optimizadas": "sum"
         }).reset_index()
@@ -502,7 +551,7 @@ if menu == "📊 Dashboard":
         st.divider()
 
         # -------------------------
-        # PORCENTAJE DE OPTIMIZACIÓN
+        # PORCENTAJE DE OPTIMIZACIÓN (ACTUALIZADO CON FILTROS)
         # -------------------------
 
         porcentaje_opt = (total_horas_opt / total_horas_mes) * 100 if total_horas_mes > 0 else 0
@@ -515,12 +564,12 @@ if menu == "📊 Dashboard":
         st.divider()
 
         # -------------------------
-        # TOP AUTOMATIZACIONES
+        # TOP AUTOMATIZACIONES (ACTUALIZADO CON FILTROS)
         # -------------------------
 
         st.subheader("💡 Top 10 Automatizaciones por Impacto")
 
-        df_terminadas = df[df['estado'] == 'Terminado'].copy()
+        df_terminadas = df_filtrado[df_filtrado['estado'] == 'Terminado'].copy()
         
         if not df_terminadas.empty:
 
@@ -541,7 +590,7 @@ if menu == "📊 Dashboard":
             st.dataframe(df_terminadas, use_container_width=True, height=400)
 
         else:
-            st.info("Aún no hay tareas terminadas con datos de optimización")
+            st.info("Aún no hay tareas terminadas con datos de optimización en los filtros seleccionados")
 
 # -------------------------
 # GESTIÓN DE TAREAS
