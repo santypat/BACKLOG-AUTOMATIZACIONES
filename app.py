@@ -1139,24 +1139,28 @@ elif menu == "➕ Nueva Tarea":
                     st.error("❌ Debes seleccionar al menos un desarrollador")
                 else:
                     datos = (
-                        nombre,
-                        celula,
-                        horas,
-                        0,  # horas_optimizadas
-                        "",  # descripcion
-                        "Backlog",  # estado inicial
-                        datetime.now().strftime("%Y-%m-%d"),
-                        puntos,
-                        analista,
-                        categoria,
-                        frecuencia,
-                        sprint
+                        nombre,                                    # 0
+                        prioridad,                                 # 1 ✅ AGREGADO
+                        "",                                        # 2 ✅ descripcion_desarrollo
+                        celula,                                    # 3
+                        horas,                                     # 4
+                        0,                                         # 5 - horas_optimizadas
+                        "",                                        # 6 - descripcion
+                        "Backlog",                                 # 7 - estado inicial
+                        datetime.now().strftime("%Y-%m-%d"),       # 8 - fecha
+                        puntos,                                    # 9
+                        analista,                                  # 10
+                        categoria,                                 # 11
+                        frecuencia,                                # 12
+                        sprint                                     # 13
                     )
                     
                     if insertar_tarea(datos, devs_sel):
                         st.success("✅ Tarea creada exitosamente!")
                         st.balloons()
                         st.rerun()
+                    
+                  
 
 # -------------------------
 # DESARROLLADORES
