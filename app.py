@@ -513,9 +513,9 @@ if menu == "📊 Dashboard":
         ahorro_total = total_horas_mes - total_horas_opt
         
         col1.metric("📦 Total Tareas", total_tareas)
-        col2.metric("⏱️ Horas/Mes", f"{total_horas_mes:,}")
+        col2.metric("⏱️ Horas operativas manuales", f"{total_horas_mes:,}")
         col3.metric("✨ Horas Optimizadas", f"{total_horas_opt:,}")
-        col4.metric("🚀 Ahorro Total", f"{ahorro_total:,}", delta=f"{ahorro_total} horas")
+        col4.metric("🚀 Horas operativas optimizadas", f"{ahorro_total:,}", delta=f"{ahorro_total} horas")
         
         st.divider()
         
