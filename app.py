@@ -979,13 +979,11 @@ elif menu == "📝 Gestión de Tareas":
                 # -------- GUARDAR CAMBIOS --------
 
                 if guardar:
-
                     devs = [x.strip() for x in desarrolladores.split(",") if x.strip()]
-
+                    
                     try:
-
+                        # 1. Actualizar datos del desarrollo
                         supabase.table("desarrollos").update({
-
                             "nombre": nombre,
                             "celula": celula,
                             "prioridad": prioridad,
@@ -997,11 +995,14 @@ elif menu == "📝 Gestión de Tareas":
                             "sprint": sprint,
                             "descripcion_desarrollo": descripcion,
                             "fecha_inicio": str(fecha_inicio),
-                            "fecha_fin": str(fecha_fin),
-                            "desarrolladores": ", ".join(devs)
-
+                            "fecha_fin": str(fecha_fin)
+                            # ✅ ELIMINADA la línea de desarrolladores
                         }).eq("id", id_editar).execute()
-
+                        
+                        # 2. Actualizar desarrolladores usando la tabla relacional
+                        if devs:
+                            reasignar_desarrolladores(id_editar, devs)
+                        
                         st.success("✅ Desarrollo actualizado correctamente")
                         st.rerun()
 
