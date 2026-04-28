@@ -519,36 +519,33 @@ if menu == "📊 Dashboard":
         
         st.divider()
         
-        # -------------------------
-        # GRAFICO DE HORAS POR MES (ACTUALIZADO CON FILTROS)
-        # -------------------------
+        st.subheader("📊 Comparación Horas Manuales vs Optimizadas")
 
-        st.subheader("📊 Impacto de Automatizaciones por Mes")
+        horas_manuales = df_filtrado["horas_mes"].sum()
+        horas_optimizadas = df_filtrado["horas_optimizadas"].sum()
 
-        df_filtrado['fecha'] = pd.to_datetime(df_filtrado['fecha'])
-        df_filtrado['mes'] = df_filtrado['fecha'].dt.to_period("M").astype(str)
-
-        df_mes = df_filtrado.groupby("mes").agg({
-            "horas_mes": "sum",
-            "horas_optimizadas": "sum"
-        }).reset_index()
+        df_grafico = pd.DataFrame({
+            "Tipo": ["Horas Manuales", "Horas Optimizadas"],
+            "Horas": [horas_manuales, horas_optimizadas]
+        })
 
         fig = px.bar(
-            df_mes,
-            x="mes",
-            y=["horas_mes", "horas_optimizadas"],
-            barmode="stack",
-            labels={
-                "value": "Horas",
-                "mes": "Mes",
-                "variable": "Tipo de Horas"
-            },
-            title="Horas Manuales vs Horas Optimizadas"
+            df_grafico,
+            x="Tipo",
+            y="Horas",
+            text="Horas",
+            title="Impacto de Automatización",
+        )
+
+        fig.update_traces(textposition="outside")
+
+        fig.update_layout(
+            xaxis_title="Tipo de Horas",
+            yaxis_title="Horas",
+            height=450
         )
 
         st.plotly_chart(fig, use_container_width=True)
-        
-        st.divider()
 
         # -------------------------
         # PORCENTAJE DE OPTIMIZACIÓN (ACTUALIZADO CON FILTROS)
