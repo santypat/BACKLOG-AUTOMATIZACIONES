@@ -522,10 +522,10 @@ if menu == "📊 Dashboard":
         st.subheader("📊 Comparación Horas Manuales vs Optimizadas")
 
         horas_manuales = df_filtrado["horas_mes"].sum()
-        horas_optimizadas = df_filtrado["horas_optimizadas"].sum()
+        horas_optimizadas = df_filtrado["oras/mes optimizadas"].sum()
 
         df_grafico = pd.DataFrame({
-            "Tipo": ["Horas Manuales", "Horas Optimizadas"],
+            "Tipo": ["Horas Manuales", "oras/mes optimizadas"],
             "Horas": [horas_manuales, horas_optimizadas]
         })
 
