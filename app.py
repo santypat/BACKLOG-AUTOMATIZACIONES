@@ -506,27 +506,28 @@ if menu == "📊 Dashboard":
         # -------------------------
 
         col1, col2, col3, col4 = st.columns(4)
-        
+
         total_tareas = len(df_filtrado)
         total_horas_mes = int(df_filtrado["horas_mes"].sum())
         total_horas_opt = int(df_filtrado["horas_optimizadas"].sum())
         ahorro_total = total_horas_mes - total_horas_opt
-        
+
         col1.metric("📦 Total Tareas", total_tareas)
         col2.metric("⏱️ Horas/mes manuales", f"{total_horas_mes:,}")
         col3.metric("✨ Horas Optimizadas", f"{total_horas_opt:,}")
         col4.metric("🚀 Horas/mes optimizadas", f"{ahorro_total:,}", delta=f"{ahorro_total} horas")
-        
+
         st.divider()
-        
+
         st.subheader("📊 Comparación Horas Manuales vs Optimizadas")
 
+        # valores para la gráfica
         horas_manuales = df_filtrado["horas_mes"].sum()
-        horas_optimizadas = df_filtrado["oras/mes optimizadas"].sum()
+        horas_mes_optimizadas = ahorro_total
 
         df_grafico = pd.DataFrame({
-            "Tipo": ["Horas Manuales", "oras/mes optimizadas"],
-            "Horas": [horas_manuales, horas_optimizadas]
+            "Tipo": ["⏱️ Horas/mes manuales", "🚀 Horas/mes optimizadas"],
+            "Horas": [horas_manuales, horas_mes_optimizadas]
         })
 
         fig = px.bar(
