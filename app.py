@@ -526,32 +526,35 @@ def generar_tabla_con_tooltips(df_display, df_original):
             desc_escaped = 'Sin descripción'
             desc_dev_escaped = 'Sin descripción técnica'
         
-        tabla_html += '<tr style="border-bottom: 1px solid #e9ecef; cursor: pointer;" class="tooltip-container">'
+        tabla_html += '<tr style="border-bottom: 1px solid #e9ecef;">'
         
         for col_name, valor in row.items():
-            tabla_html += f'<td style="padding: 10px 8px;">{valor}</td>'
-        
-        # Agregar tooltips al final de la fila (invisibles)
-        tabla_html += f'''
-            <div class="tooltip-desc">
-                <div class="tooltip-label">📋 DESCRIPCIÓN GENERAL</div>
-                <div class="tooltip-content">{desc_escaped}</div>
-            </div>
-            <div class="tooltip-desc-dev">
-                <div class="tooltip-label">💻 DESCRIPCIÓN TÉCNICA</div>
-                <div class="tooltip-content">{desc_dev_escaped}</div>
-            </div>
-        '''
-        
+
+            if col_name == "Nombre":
+
+                tabla_html += f"""
+                <td style="padding: 10px 8px; position: relative;" class="tooltip-container">
+
+                    {valor}
+
+                    <div class="tooltip-desc">
+                        <div class="tooltip-label">📋 DESCRIPCIÓN GENERAL</div>
+                        <div class="tooltip-content">{desc_escaped}</div>
+                    </div>
+
+                    <div class="tooltip-desc-dev">
+                        <div class="tooltip-label">💻 DESCRIPCIÓN TÉCNICA</div>
+                        <div class="tooltip-content">{desc_dev_escaped}</div>
+                    </div>
+
+                </td>
+                """
+
+            else:
+
+                tabla_html += f'<td style="padding: 10px 8px;">{valor}</td>'
+
         tabla_html += '</tr>'
-    
-    tabla_html += """
-            </tbody>
-        </table>
-    </div>
-    """
-    
-    return tabla_html
 
 def crear_plantilla_excel():
 
