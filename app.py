@@ -488,9 +488,13 @@ def generar_tabla_con_tooltips(df_display, df_original):
     """
     Genera una tabla HTML con tooltips para descripción y descripción_desarrollo
     """
+
     import html
 
-    # Crear HTML base
+    # =========================
+    # CONTENEDOR PRINCIPAL
+    # =========================
+
     tabla_html = """
     <div style="
         overflow-x: auto;
@@ -498,25 +502,30 @@ def generar_tabla_con_tooltips(df_display, df_original):
         overflow-y: auto;
         border: 1px solid #e0e0e0;
         border-radius: 8px;
+        background-color: white;
     ">
 
         <table style="
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
+            min-width: 1200px;
         ">
 
             <thead style="
                 position: sticky;
                 top: 0;
-                background-color: #f8f9fa;
                 z-index: 10;
+                background-color: #f8f9fa;
             ">
 
                 <tr>
     """
 
-    # Encabezados
+    # =========================
+    # ENCABEZADOS
+    # =========================
+
     for col in df_display.columns:
 
         tabla_html += f"""
@@ -527,6 +536,7 @@ def generar_tabla_con_tooltips(df_display, df_original):
             font-weight: 600;
             color: #495057;
             background-color: #f8f9fa;
+            white-space: nowrap;
         ">
             {col}
         </th>
@@ -539,7 +549,10 @@ def generar_tabla_con_tooltips(df_display, df_original):
             <tbody>
     """
 
-    # Filas
+    # =========================
+    # FILAS
+    # =========================
+
     for idx, row in df_display.iterrows():
 
         # Buscar datos originales
@@ -568,14 +581,14 @@ def generar_tabla_con_tooltips(df_display, df_original):
             if desc_dev in ["nan", "None"]:
                 desc_dev = "Sin descripción técnica"
 
-            # Escapar HTML
-            desc_escaped = html.escape(desc)
-            desc_dev_escaped = html.escape(desc_dev)
-
         else:
 
-            desc_escaped = "Sin descripción"
-            desc_dev_escaped = "Sin descripción técnica"
+            desc = "Sin descripción"
+            desc_dev = "Sin descripción técnica"
+
+        # Escapar HTML
+        desc_escaped = html.escape(desc)
+        desc_dev_escaped = html.escape(desc_dev)
 
         tabla_html += """
         <tr style="
@@ -583,10 +596,15 @@ def generar_tabla_con_tooltips(df_display, df_original):
         ">
         """
 
-        # Columnas
+        # =========================
+        # COLUMNAS
+        # =========================
+
         for col_name, valor in row.items():
 
-            # Tooltip SOLO en columna Nombre
+            valor = html.escape(str(valor))
+
+            # TOOLTIP SOLO EN NOMBRE
             if col_name == "Nombre":
 
                 tabla_html += f"""
@@ -602,7 +620,7 @@ def generar_tabla_con_tooltips(df_display, df_original):
 
                     {valor}
 
-                    <!-- Tooltip descripción general -->
+                    <!-- TOOLTIP GENERAL -->
                     <div class="tooltip-desc">
 
                         <div class="tooltip-label">
@@ -615,7 +633,7 @@ def generar_tabla_con_tooltips(df_display, df_original):
 
                     </div>
 
-                    <!-- Tooltip descripción técnica -->
+                    <!-- TOOLTIP TÉCNICO -->
                     <div class="tooltip-desc-dev">
 
                         <div class="tooltip-label">
@@ -636,6 +654,7 @@ def generar_tabla_con_tooltips(df_display, df_original):
                 tabla_html += f"""
                 <td style="
                     padding: 10px 8px;
+                    white-space: nowrap;
                 ">
                     {valor}
                 </td>
@@ -643,7 +662,10 @@ def generar_tabla_con_tooltips(df_display, df_original):
 
         tabla_html += "</tr>"
 
-    # Cerrar tabla
+    # =========================
+    # CERRAR TABLA
+    # =========================
+
     tabla_html += """
             </tbody>
 
@@ -954,7 +976,6 @@ elif menu == "📝 Gestión de Tareas":
                 'Fecha'
         ]
         
-        # Mostrar tabla personalizada con tooltips
         tabla_html = generar_tabla_con_tooltips(
             df_display,
             df_filtrado
