@@ -486,16 +486,115 @@ def eliminar_tareas_multiples(ids):
 
 def generar_tabla_con_tooltips(df_display, df_original):
     """
-    Genera una tabla HTML con tooltips para descripción y descripción_desarrollo
+    Genera una tabla HTML con tooltips flotantes
+    para descripción y descripción_desarrollo
     """
 
     import html
 
-    # =========================
-    # CONTENEDOR PRINCIPAL
-    # =========================
+    # =====================================================
+    # CSS + CONTENEDOR PRINCIPAL
+    # =====================================================
 
     tabla_html = """
+
+    <style>
+
+    .tooltip-container {
+        position: relative;
+        cursor: pointer;
+    }
+
+    .tooltip-desc {
+
+        visibility: hidden;
+        opacity: 0;
+
+        position: absolute;
+
+        top: -10px;
+        left: 105%;
+
+        width: 340px;
+
+        background-color: #2196F3;
+        color: white;
+
+        padding: 14px;
+
+        border-radius: 10px;
+
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+
+        z-index: 9999;
+
+        transition: opacity 0.2s ease;
+
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .tooltip-desc-dev {
+
+        visibility: hidden;
+        opacity: 0;
+
+        position: absolute;
+
+        top: 140px;
+        left: 105%;
+
+        width: 340px;
+
+        background-color: #4CAF50;
+        color: white;
+
+        padding: 14px;
+
+        border-radius: 10px;
+
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+
+        z-index: 9999;
+
+        transition: opacity 0.2s ease;
+
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .tooltip-container:hover .tooltip-desc,
+    .tooltip-container:hover .tooltip-desc-dev {
+
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .tooltip-label {
+
+        font-weight: bold;
+        margin-bottom: 8px;
+        font-size: 12px;
+    }
+
+    .tooltip-content {
+
+        font-size: 13px;
+        white-space: normal;
+    }
+
+    tr:hover {
+
+        background-color: #f8f9fa;
+    }
+
+    table {
+
+        font-family: Arial, sans-serif;
+    }
+
+    </style>
+
     <div style="
         overflow-x: auto;
         max-height: 500px;
@@ -522,9 +621,9 @@ def generar_tabla_con_tooltips(df_display, df_original):
                 <tr>
     """
 
-    # =========================
+    # =====================================================
     # ENCABEZADOS
-    # =========================
+    # =====================================================
 
     for col in df_display.columns:
 
@@ -549,14 +648,16 @@ def generar_tabla_con_tooltips(df_display, df_original):
             <tbody>
     """
 
-    # =========================
+    # =====================================================
     # FILAS
-    # =========================
+    # =====================================================
 
     for idx, row in df_display.iterrows():
 
-        # Buscar datos originales
-        fila_original = df_original[df_original["id"] == row["ID"]]
+        # Buscar información original
+        fila_original = df_original[
+            df_original["id"] == row["ID"]
+        ]
 
         if not fila_original.empty:
 
@@ -574,7 +675,7 @@ def generar_tabla_con_tooltips(df_display, df_original):
                 )
             )
 
-            # Limpiar valores vacíos
+            # Limpiar valores
             if desc in ["nan", "None"]:
                 desc = "Sin descripción"
 
@@ -596,9 +697,9 @@ def generar_tabla_con_tooltips(df_display, df_original):
         ">
         """
 
-        # =========================
+        # =====================================================
         # COLUMNAS
-        # =========================
+        # =====================================================
 
         for col_name, valor in row.items():
 
@@ -615,10 +716,13 @@ def generar_tabla_con_tooltips(df_display, df_original):
                         position: relative;
                         cursor: pointer;
                         font-weight: 500;
+                        min-width: 180px;
                     "
                 >
 
-                    {valor}
+                    <div>
+                        {valor}
+                    </div>
 
                     <!-- TOOLTIP GENERAL -->
                     <div class="tooltip-desc">
@@ -662,9 +766,9 @@ def generar_tabla_con_tooltips(df_display, df_original):
 
         tabla_html += "</tr>"
 
-    # =========================
+    # =====================================================
     # CERRAR TABLA
-    # =========================
+    # =====================================================
 
     tabla_html += """
             </tbody>
@@ -983,7 +1087,7 @@ elif menu == "📝 Gestión de Tareas":
 
         components.html(
             tabla_html,
-            height=500,
+            height=550,
             scrolling=True
         )
         
