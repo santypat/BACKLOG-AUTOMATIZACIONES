@@ -92,6 +92,97 @@ st.markdown("""
         border: 1px solid #e0e0e0;
         border-radius: 8px;
     }
+    
+    /* Estilos para tooltips de descripción */
+    .tooltip-container {
+        position: relative;
+        display: inline-block;
+        cursor: help;
+    }
+    
+    .tooltip-desc {
+        visibility: hidden;
+        position: absolute;
+        z-index: 1000;
+        background-color: #2196F3;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        width: 350px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-size: 13px;
+        line-height: 1.5;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 120%;
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+    }
+    
+    .tooltip-desc::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -8px;
+        border-width: 8px;
+        border-style: solid;
+        border-color: #2196F3 transparent transparent transparent;
+    }
+    
+    .tooltip-desc-dev {
+        visibility: hidden;
+        position: absolute;
+        z-index: 999;
+        background-color: #4CAF50;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        width: 350px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-size: 13px;
+        line-height: 1.5;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 120%;
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+    }
+    
+    .tooltip-desc-dev::after {
+        content: "";
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        margin-left: -8px;
+        border-width: 8px;
+        border-style: solid;
+        border-color: transparent transparent #4CAF50 transparent;
+    }
+    
+    .tooltip-container:hover .tooltip-desc,
+    .tooltip-container:hover .tooltip-desc-dev {
+        visibility: visible;
+        opacity: 1;
+    }
+    
+    .tooltip-label {
+        font-weight: bold;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+        opacity: 0.9;
+    }
+    
+    .tooltip-content {
+        font-size: 13px;
+        line-height: 1.6;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -392,6 +483,75 @@ def eliminar_tareas_multiples(ids):
     except Exception as e:
         st.error(f"Error al eliminar tareas: {e}")
         return False
+
+def generar_tabla_con_tooltips(df_display, df_original):
+    """
+    Genera una tabla HTML con tooltips para descripción y descripción_desarrollo
+    """
+    import html
+    
+    # Crear el HTML de la tabla
+    tabla_html = """
+    <div style="overflow-x: auto; max-height: 500px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead style="position: sticky; top: 0; background-color: #f8f9fa; z-index: 10;">
+                <tr>
+    """
+    
+    # Agregar encabezados
+    for col in df_display.columns:
+        tabla_html += f'<th style="padding: 12px 8px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #495057;">{col}</th>'
+    
+    tabla_html += "</tr></thead><tbody>"
+    
+    # Agregar filas con tooltips
+    for idx, row in df_display.iterrows():
+        # Obtener las descripciones del dataframe original
+        fila_original = df_original[df_original['id'] == row['ID']]
+        
+        if not fila_original.empty:
+            desc = str(fila_original.iloc[0].get('descripcion', 'Sin descripción'))
+            desc_dev = str(fila_original.iloc[0].get('descripcion_desarrollo', 'Sin descripción'))
+            
+            # Limpiar las descripciones
+            if desc == 'nan' or desc == 'None':
+                desc = 'Sin descripción'
+            if desc_dev == 'nan' or desc_dev == 'None':
+                desc_dev = 'Sin descripción técnica'
+            
+            # Escapar HTML
+            desc_escaped = html.escape(desc)
+            desc_dev_escaped = html.escape(desc_dev)
+        else:
+            desc_escaped = 'Sin descripción'
+            desc_dev_escaped = 'Sin descripción técnica'
+        
+        tabla_html += '<tr style="border-bottom: 1px solid #e9ecef; cursor: pointer;" class="tooltip-container">'
+        
+        for col_name, valor in row.items():
+            tabla_html += f'<td style="padding: 10px 8px;">{valor}</td>'
+        
+        # Agregar tooltips al final de la fila (invisibles)
+        tabla_html += f'''
+            <div class="tooltip-desc">
+                <div class="tooltip-label">📋 DESCRIPCIÓN GENERAL</div>
+                <div class="tooltip-content">{desc_escaped}</div>
+            </div>
+            <div class="tooltip-desc-dev">
+                <div class="tooltip-label">💻 DESCRIPCIÓN TÉCNICA</div>
+                <div class="tooltip-content">{desc_dev_escaped}</div>
+            </div>
+        '''
+        
+        tabla_html += '</tr>'
+    
+    tabla_html += """
+            </tbody>
+        </table>
+    </div>
+    """
+    
+    return tabla_html
 
 def crear_plantilla_excel():
 
