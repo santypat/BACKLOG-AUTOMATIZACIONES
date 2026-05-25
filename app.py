@@ -783,17 +783,45 @@ def generar_tabla_con_tooltips(df_display, df_original):
 def crear_plantilla_excel():
 
     data = {
-        "nombre": ["Ejemplo: Automatización de reportes"],
+
+        "nombre": ["Automatización reporte cartera"],
+
         "prioridad": ["MEDIA"],
-        "descripcion_desarrollo": ["Automatiza la generación del reporte mensual"],
+
+        "descripcion_desarrollo": [
+            "Automatiza generación de reportes"
+        ],
+
+        "descripcion": [
+            "Automatización terminada correctamente"
+        ],
+
         "celula": ["Backend"],
+
         "horas_mes": [40],
+
+        "horas_optimizadas": [5],
+
+        "estado": ["Backlog"],
+
         "puntos": [8],
-        "analista": ["María García"],
+
+        "analista": ["Juan Pérez"],
+
         "categoria": ["PROCESO"],
+
         "frecuencia": ["Mensual"],
+
         "sprint": ["Sprint 1"],
-        "desarrolladores": ["Juan Pérez, Carlos López"]
+
+        "desarrolladores": [
+            "Carlos López, Ana Ruiz"
+        ],
+
+        "fecha_inicio": [""],
+
+        "fecha_fin": [""]
+
     }
 
     df = pd.DataFrame(data)
@@ -1735,6 +1763,7 @@ desarrolladores
             df_excel.columns = df_excel.columns.str.lower().str.strip()
 
             columnas_requeridas = [
+
                 "nombre",
                 "prioridad",
                 "descripcion_desarrollo",
@@ -1746,6 +1775,7 @@ desarrolladores
                 "frecuencia",
                 "sprint",
                 "desarrolladores"
+
             ]
 
             columnas_faltantes = [c for c in columnas_requeridas if c not in df_excel.columns]
@@ -1794,21 +1824,36 @@ desarrolladores
                             else:
                                 devs = []
 
+                            estado = str(r.get("estado", "Backlog")).strip()
+
+                            if estado == "" or estado.lower() == "nan":
+                                estado = "Backlog"
+
+                            descripcion_final = str(
+                                r.get("descripcion", "")
+                            ).strip()
+
+                            horas_optimizadas = int(
+                                r.get("horas_optimizadas", 0)
+                            ) if pd.notna(r.get("horas_optimizadas", 0)) else 0
+
                             datos = (
-                                nombre,
-                                prioridad,
-                                descripcion,
-                                celula,
-                                horas_mes,
-                                0,
-                                "",
-                                "Backlog",
-                                datetime.now().strftime("%Y-%m-%d"),
-                                puntos,
-                                analista,
-                                categoria,
-                                frecuencia,
-                                sprint
+
+                                nombre,                    # 0
+                                prioridad,                 # 1
+                                descripcion,               # 2
+                                celula,                    # 3
+                                horas_mes,                 # 4
+                                horas_optimizadas,         # 5
+                                descripcion_final,         # 6
+                                estado,                    # 7
+                                datetime.now().strftime("%Y-%m-%d"),  # 8
+                                puntos,                    # 9
+                                analista,                  # 10
+                                categoria,                 # 11
+                                frecuencia,                # 12
+                                sprint                     # 13
+
                             )
 
                             if insertar_tarea(datos, devs):
@@ -1862,7 +1907,44 @@ elif menu == "📤 Exportar Excel":
         with col_exp2:
             # Exportar a Excel
             buffer_excel = io.BytesIO()
-            df.to_excel(buffer_excel, index=False, sheet_name='Backlog')
+            columnas_exportar = [
+
+                "id",
+                "nombre",
+                "prioridad",
+                "descripcion_desarrollo",
+                "descripcion",
+                "estado",
+                "celula",
+                "horas_mes",
+                "horas_optimizadas",
+                "horas_restantes",
+                "puntos",
+                "analista",
+                "categoria",
+                "frecuencia",
+                "sprint",
+                "desarrolladores",
+                "fecha",
+                "fecha_inicio",
+                "fecha_fin"
+
+            ]
+
+            df_export = df.copy()
+
+            for col in columnas_exportar:
+
+                if col not in df_export.columns:
+                    df_export[col] = ""
+
+            df_export = df_export[columnas_exportar]
+
+            df_export.to_excel(
+                buffer_excel,
+                index=False,
+                sheet_name='Backlog'
+            )
             
             st.download_button(
                 label="📥 Descargar Excel",
