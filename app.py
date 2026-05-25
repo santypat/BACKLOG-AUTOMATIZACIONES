@@ -853,11 +853,15 @@ elif menu == "📝 Gestión de Tareas":
                 'Fecha'
         ]
         
-        # Mostrar tabla con capacidad de selección
-        st.dataframe(
+        # Mostrar tabla personalizada con tooltips
+        tabla_html = generar_tabla_con_tooltips(
             df_display,
-            use_container_width=True,
-            height=400
+            df_filtrado
+        )
+
+        st.markdown(
+            tabla_html,
+            unsafe_allow_html=True
         )
         
         st.divider()
