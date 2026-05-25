@@ -489,67 +489,143 @@ def generar_tabla_con_tooltips(df_display, df_original):
     Genera una tabla HTML con tooltips para descripción y descripción_desarrollo
     """
     import html
-    
-    # Crear el HTML de la tabla
+
+    # Crear HTML base
     tabla_html = """
-    <div style="overflow-x: auto; max-height: 500px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <thead style="position: sticky; top: 0; background-color: #f8f9fa; z-index: 10;">
+    <div style="
+        overflow-x: auto;
+        max-height: 500px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+    ">
+
+        <table style="
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        ">
+
+            <thead style="
+                position: sticky;
+                top: 0;
+                background-color: #f8f9fa;
+                z-index: 10;
+            ">
+
                 <tr>
     """
-    
-    # Agregar encabezados
+
+    # Encabezados
     for col in df_display.columns:
-        tabla_html += f'<th style="padding: 12px 8px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #495057;">{col}</th>'
-    
-    tabla_html += "</tr></thead><tbody>"
-    
-    
-    # Agregar filas con tooltips
+
+        tabla_html += f"""
+        <th style="
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+            color: #495057;
+            background-color: #f8f9fa;
+        ">
+            {col}
+        </th>
+        """
+
+    tabla_html += """
+                </tr>
+            </thead>
+
+            <tbody>
+    """
+
+    # Filas
     for idx, row in df_display.iterrows():
 
-        # Obtener las descripciones del dataframe original
-        fila_original = df_original[df_original['id'] == row['ID']]
+        # Buscar datos originales
+        fila_original = df_original[df_original["id"] == row["ID"]]
 
         if not fila_original.empty:
 
-            desc = str(fila_original.iloc[0].get('descripcion', 'Sin descripción'))
-            desc_dev = str(fila_original.iloc[0].get('descripcion_desarrollo', 'Sin descripción'))
+            desc = str(
+                fila_original.iloc[0].get(
+                    "descripcion",
+                    "Sin descripción"
+                )
+            )
 
-            if desc == 'nan' or desc == 'None':
-                desc = 'Sin descripción'
+            desc_dev = str(
+                fila_original.iloc[0].get(
+                    "descripcion_desarrollo",
+                    "Sin descripción técnica"
+                )
+            )
 
-            if desc_dev == 'nan' or desc_dev == 'None':
-                desc_dev = 'Sin descripción técnica'
+            # Limpiar valores vacíos
+            if desc in ["nan", "None"]:
+                desc = "Sin descripción"
 
+            if desc_dev in ["nan", "None"]:
+                desc_dev = "Sin descripción técnica"
+
+            # Escapar HTML
             desc_escaped = html.escape(desc)
             desc_dev_escaped = html.escape(desc_dev)
 
         else:
 
-            desc_escaped = 'Sin descripción'
-            desc_dev_escaped = 'Sin descripción técnica'
+            desc_escaped = "Sin descripción"
+            desc_dev_escaped = "Sin descripción técnica"
 
-        tabla_html += '<tr style="border-bottom: 1px solid #e9ecef;">'
+        tabla_html += """
+        <tr style="
+            border-bottom: 1px solid #e9ecef;
+        ">
+        """
 
+        # Columnas
         for col_name, valor in row.items():
 
             # Tooltip SOLO en columna Nombre
             if col_name == "Nombre":
 
                 tabla_html += f"""
-                <td style="padding: 10px 8px; position: relative;" class="tooltip-container">
+                <td
+                    class="tooltip-container"
+                    style="
+                        padding: 10px 8px;
+                        position: relative;
+                        cursor: pointer;
+                        font-weight: 500;
+                    "
+                >
 
                     {valor}
 
+                    <!-- Tooltip descripción general -->
                     <div class="tooltip-desc">
-                        <div class="tooltip-label">📋 DESCRIPCIÓN GENERAL</div>
-                        <div class="tooltip-content">{desc_escaped}</div>
+
+                        <div class="tooltip-label">
+                            📋 DESCRIPCIÓN GENERAL
+                        </div>
+
+                        <div class="tooltip-content">
+                            {desc_escaped}
+                        </div>
+
                     </div>
 
+                    <!-- Tooltip descripción técnica -->
                     <div class="tooltip-desc-dev">
-                        <div class="tooltip-label">💻 DESCRIPCIÓN TÉCNICA</div>
-                        <div class="tooltip-content">{desc_dev_escaped}</div>
+
+                        <div class="tooltip-label">
+                            💻 DESCRIPCIÓN TÉCNICA
+                        </div>
+
+                        <div class="tooltip-content">
+                            {desc_dev_escaped}
+                        </div>
+
                     </div>
 
                 </td>
@@ -557,9 +633,26 @@ def generar_tabla_con_tooltips(df_display, df_original):
 
             else:
 
-                tabla_html += f'<td style="padding: 10px 8px;">{valor}</td>'
+                tabla_html += f"""
+                <td style="
+                    padding: 10px 8px;
+                ">
+                    {valor}
+                </td>
+                """
 
-        tabla_html += '</tr>'
+        tabla_html += "</tr>"
+
+    # Cerrar tabla
+    tabla_html += """
+            </tbody>
+
+        </table>
+
+    </div>
+    """
+
+    return tabla_html
 
 def crear_plantilla_excel():
 
