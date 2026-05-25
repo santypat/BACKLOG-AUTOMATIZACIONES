@@ -5,7 +5,7 @@ from supabase import create_client
 import os
 import io
 import plotly.express as px
-
+import streamlit.components.v1 as components
 
 def actualizar_tarea(datos, devs):
 
@@ -981,9 +981,10 @@ elif menu == "📝 Gestión de Tareas":
             df_filtrado
         )
 
-        st.markdown(
+        components.html(
             tabla_html,
-            unsafe_allow_html=True
+            height=500,
+            scrolling=True
         )
         
         st.divider()
