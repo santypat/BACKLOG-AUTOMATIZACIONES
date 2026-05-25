@@ -504,32 +504,37 @@ def generar_tabla_con_tooltips(df_display, df_original):
     
     tabla_html += "</tr></thead><tbody>"
     
+    
     # Agregar filas con tooltips
     for idx, row in df_display.iterrows():
+
         # Obtener las descripciones del dataframe original
         fila_original = df_original[df_original['id'] == row['ID']]
-        
+
         if not fila_original.empty:
+
             desc = str(fila_original.iloc[0].get('descripcion', 'Sin descripción'))
             desc_dev = str(fila_original.iloc[0].get('descripcion_desarrollo', 'Sin descripción'))
-            
-            # Limpiar las descripciones
+
             if desc == 'nan' or desc == 'None':
                 desc = 'Sin descripción'
+
             if desc_dev == 'nan' or desc_dev == 'None':
                 desc_dev = 'Sin descripción técnica'
-            
-            # Escapar HTML
+
             desc_escaped = html.escape(desc)
             desc_dev_escaped = html.escape(desc_dev)
+
         else:
+
             desc_escaped = 'Sin descripción'
             desc_dev_escaped = 'Sin descripción técnica'
-        
+
         tabla_html += '<tr style="border-bottom: 1px solid #e9ecef;">'
-        
+
         for col_name, valor in row.items():
 
+            # Tooltip SOLO en columna Nombre
             if col_name == "Nombre":
 
                 tabla_html += f"""
