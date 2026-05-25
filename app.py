@@ -7,93 +7,6 @@ import io
 import plotly.express as px
 import streamlit.components.v1 as components
 
-# =====================================================
-# COLUMNAS UNIVERSALES DEL BACKLOG
-# =====================================================
-
-COLUMNAS_HISTORIAS = [
-
-    "id",
-    "nombre",
-    "cedula",
-
-    "horas_mes",
-    "horas_opt",
-    "horas_re",
-
-    "descripcion",
-    "descripcion_desarrollo",
-
-    "estado",
-
-    "fecha",
-    "fecha_inicio",
-    "fecha_fin",
-
-    "duracion",
-
-    "puntos",
-
-    "analista",
-    "desarrollador",
-
-    "categoria",
-    "frecuencia",
-    "sprint",
-
-    "prioridad",
-    "impacto_prioridad",
-
-    "desarrollo"
-]
-
-# =====================================================
-# COLUMNAS OBLIGATORIAS PARA IMPORTAR
-# =====================================================
-
-COLUMNAS_OBLIGATORIAS = [
-
-    "nombre",
-    "estado"
-]
-
-st.markdown("**Columnas disponibles en la plantilla universal:**")
-
-st.code("""
-id
-nombre
-cedula
-
-horas_mes
-horas_opt
-horas_re
-
-descripcion
-descripcion_desarrollo
-
-estado
-
-fecha
-fecha_inicio
-fecha_fin
-
-duracion
-
-puntos
-
-analista
-desarrollador
-
-categoria
-frecuencia
-sprint
-
-prioridad
-impacto_prioridad
-
-desarrollo
-""")
-
 def actualizar_tarea(datos, devs):
 
     try:
@@ -1174,7 +1087,7 @@ elif menu == "📝 Gestión de Tareas":
 
         components.html(
             tabla_html,
-            height=50,
+            height=550,
             scrolling=True
         )
         
@@ -1821,7 +1734,19 @@ desarrolladores
             # NORMALIZAR COLUMNAS
             df_excel.columns = df_excel.columns.str.lower().str.strip()
 
-            columnas_requeridas = COLUMNAS_OBLIGATORIAS
+            columnas_requeridas = [
+                "nombre",
+                "prioridad",
+                "descripcion_desarrollo",
+                "celula",
+                "horas_mes",
+                "puntos",
+                "analista",
+                "categoria",
+                "frecuencia",
+                "sprint",
+                "desarrolladores"
+            ]
 
             columnas_faltantes = [c for c in columnas_requeridas if c not in df_excel.columns]
 
@@ -1845,145 +1770,44 @@ desarrolladores
 
                         try:
 
-                            # =========================
-                            # CAMPOS BASE
-                            # =========================
+                            nombre = str(r["nombre"]).strip()
 
-                            nombre = str(r.get("nombre", "")).strip()
-
-                            prioridad = str(
-                                r.get("prioridad", "MEDIA")
-                            ).upper().strip()
-
+                            prioridad = str(r["prioridad"]).upper().strip()
                             if prioridad not in ["URGENTE", "MEDIA", "BAJA"]:
                                 prioridad = "MEDIA"
 
-                            descripcion = str(
-                                r.get("descripcion", "")
-                            ).strip()
+                            descripcion = str(r.get("descripcion_desarrollo", "")).strip()
 
-                            descripcion_desarrollo = str(
-                                r.get("descripcion_desarrollo", "")
-                            ).strip()
+                            celula = str(r["celula"]).strip()
 
-                            cedula = str(
-                                r.get("cedula", "")
-                            ).strip()
+                            horas_mes = int(r["horas_mes"]) if pd.notna(r["horas_mes"]) else 0
+                            puntos = int(r["puntos"]) if pd.notna(r["puntos"]) else 0
 
-                            estado = str(
-                                r.get("estado", "Backlog")
-                            ).strip()
+                            analista = str(r["analista"]).strip()
+                            categoria = str(r["categoria"]).strip()
+                            frecuencia = str(r["frecuencia"]).strip()
+                            sprint = str(r["sprint"]).strip()
 
-                            fecha = str(
-                                r.get(
-                                    "fecha",
-                                    datetime.now().strftime("%Y-%m-%d")
-                                )
-                            ).strip()
-
-                            # =========================
-                            # NUMÉRICOS
-                            # =========================
-
-                            horas_mes = int(r["horas_mes"]) if pd.notna(r.get("horas_mes")) else 0
-
-                            horas_opt = int(r["horas_opt"]) if pd.notna(r.get("horas_opt")) else 0
-
-                            horas_re = int(r["horas_re"]) if pd.notna(r.get("horas_re")) else 0
-
-                            puntos = int(r["puntos"]) if pd.notna(r.get("puntos")) else 0
-
-                            duracion = int(r["duracion"]) if pd.notna(r.get("duracion")) else 0
-
-                            # =========================
-                            # FECHAS
-                            # =========================
-
-                            fecha_inicio = str(
-                                r.get("fecha_inicio", "")
-                            ).strip()
-
-                            fecha_fin = str(
-                                r.get("fecha_fin", "")
-                            ).strip()
-
-                            # =========================
-                            # OTROS CAMPOS
-                            # =========================
-
-                            analista = str(
-                                r.get("analista", "")
-                            ).strip()
-
-                            desarrollador = str(
-                                r.get("desarrollador", "")
-                            ).strip()
-
-                            categoria = str(
-                                r.get("categoria", "")
-                            ).strip()
-
-                            frecuencia = str(
-                                r.get("frecuencia", "")
-                            ).strip()
-
-                            sprint = str(
-                                r.get("sprint", "")
-                            ).strip()
-
-                            impacto_prioridad = str(
-                                r.get("impacto_prioridad", "")
-                            ).strip()
-
-                            desarrollo = str(
-                                r.get("desarrollo", "")
-                            ).strip()
-
-                            # =========================
-                            # DESARROLLADORES
-                            # =========================
-
-                            if desarrollador:
-
-                                devs = [
-                                    x.strip()
-                                    for x in desarrollador.split(",")
-                                ]
-
+                            # desarrolladores
+                            if pd.notna(r["desarrolladores"]):
+                                devs = [x.strip() for x in str(r["desarrolladores"]).split(",")]
                             else:
-
                                 devs = []
 
-                            # =========================
-                            # DATOS
-                            # =========================
-
                             datos = (
-
                                 nombre,
                                 prioridad,
-
-                                descripcion_desarrollo,
-
-                                cedula,
-
-                                horas_mes,
-                                horas_opt,
-
                                 descripcion,
-
-                                estado,
-
-                                fecha,
-
+                                celula,
+                                horas_mes,
+                                0,
+                                "",
+                                "Backlog",
+                                datetime.now().strftime("%Y-%m-%d"),
                                 puntos,
-
                                 analista,
-
                                 categoria,
-
                                 frecuencia,
-
                                 sprint
                             )
 
@@ -2016,13 +1840,6 @@ elif menu == "📤 Exportar Excel":
     st.markdown('<h1 class="main-header">📤 Exportar Backlog</h1>', unsafe_allow_html=True)
     
     df = obtener_tareas()
-    # Reordenar columnas universales
-    columnas_existentes = [
-        c for c in COLUMNAS_HISTORIAS
-        if c in df.columns
-    ]
-
-    df = df[columnas_existentes]
     
     if df.empty:
         st.info("📭 No hay tareas para exportar")
