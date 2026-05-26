@@ -2277,6 +2277,7 @@ elif menu == "🛠️ Soportes":
         if guardar_soporte:
 
             datos = {
+
                 "fecha_ingreso": str(fecha_ingreso),
                 "fecha_entrega": str(fecha_entrega),
                 "horas_empleadas": horas_empleadas,
@@ -2284,6 +2285,7 @@ elif menu == "🛠️ Soportes":
                 "desarrollador": desarrollador,
                 "nombre_desarrollo": nombre_desarrollo,
                 "tipo_soporte": tipo_soporte,
+                "prioridad": prioridad,
                 "estado": estado,
                 "descripcion": descripcion,
                 "observaciones": observaciones
