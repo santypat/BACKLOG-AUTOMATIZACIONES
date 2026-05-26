@@ -842,6 +842,134 @@ def crear_plantilla_excel():
 
     return df
 
+# =====================================================
+# OBTENER SOPORTES
+# =====================================================
+
+def obtener_soportes():
+    
+
+    try:
+
+        response = supabase.table(
+            "soportes_mantenimiento"
+        ).select("*").order(
+            "id",
+            desc=True
+        ).execute()
+
+        data = response.data
+
+        if data:
+            return pd.DataFrame(data)
+
+        return pd.DataFrame()
+
+    except Exception as e:
+
+        st.error(f"Error obteniendo soportes: {e}")
+
+        return pd.DataFrame()
+    
+# =====================================================
+# CREAR SOPORTE
+# =====================================================
+
+def crear_soporte(
+    fecha_ingreso,
+    fecha_entrega,
+    horas_empleadas,
+    celula,
+    desarrollador,
+    desarrollo,
+    tipo_soporte,
+    prioridad,
+    estado,
+    descripcion,
+    observaciones
+):
+
+    try:
+
+        datos = {
+
+            "fecha_ingreso": str(fecha_ingreso),
+            "fecha_entrega": str(fecha_entrega),
+            "horas_empleadas": horas_empleadas,
+            "celula": celula,
+            "desarrollador": desarrollador,
+            "desarrollo": desarrollo,
+            "tipo_soporte": tipo_soporte,
+            "prioridad": prioridad,
+            "estado": estado,
+            "descripcion": descripcion,
+            "observaciones": observaciones
+
+        }
+
+        supabase.table(
+            "soportes_mantenimiento"
+        ).insert(
+            datos
+        ).execute()
+
+        return True
+
+    except Exception as e:
+
+        st.error(f"Error creando soporte: {e}")
+
+        return False
+    
+# =====================================================
+# ELIMINAR SOPORTE
+# =====================================================
+
+def eliminar_soporte(soporte_id):
+
+    try:
+
+        supabase.table(
+            "soportes_mantenimiento"
+        ).delete().eq(
+            "id",
+            soporte_id
+        ).execute()
+
+        return True
+
+    except Exception as e:
+
+        st.error(f"Error eliminando soporte: {e}")
+
+        return False
+    
+# =====================================================
+# ELIMINAR SOPORTES MULTIPLES
+# =====================================================
+
+def eliminar_soportes_multiples(ids):
+
+    try:
+
+        supabase.table(
+            "soportes_mantenimiento"
+        ).delete().in_(
+            "id",
+            ids
+        ).execute()
+
+        return True
+
+    except Exception as e:
+
+        st.error(f"Error eliminando soportes: {e}")
+
+        return False
+
+
+
+
 # -------------------------
 # SIDEBAR
 # -------------------------
@@ -853,6 +981,7 @@ menu = st.sidebar.selectbox(
         "📊 Dashboard",
         "📝 Gestión de Tareas",
         "➕ Nueva Tarea",
+        "🛠️ Soportes",
         "👨‍💻 Desarrolladores",
         "📥 Importar Excel",
         "📤 Exportar Excel"
@@ -1085,10 +1214,6 @@ if menu == "📊 Dashboard":
 
         else:
             st.info("Aún no hay tareas terminadas con datos de optimización en los filtros seleccionados")
-
-# -------------------------
-# GESTIÓN DE TAREAS
-# -------------------------
 
 # -------------------------
 # GESTIÓN DE TAREAS
@@ -1951,6 +2076,8 @@ elif menu == "📝 Gestión de Tareas":
                             )
 
                             st.rerun()
+
+
         
         # =========================================================
         # FUNCION SUGERIDA PARA ACTUALIZAR ESTADO
@@ -2039,6 +2166,230 @@ elif menu == "📝 Gestión de Tareas":
                 )
 
                 return False
+            
+
+
+# -------------------------
+# SOPORTES / MANTENIMIENTOS
+# -------------------------
+
+elif menu == "🛠️ Soportes":
+
+    st.markdown(
+        '<h1 class="main-header">🛠️ Soportes y Mantenimientos</h1>',
+        unsafe_allow_html=True
+    )
+
+    soportes_df = obtener_soportes()
+
+    tab1, tab2 = st.tabs([
+        "➕ Registrar Soporte",
+        "📋 Historial de Soportes"
+    ])
+
+    # =====================================================
+    # TAB 1 - REGISTRAR SOPORTE
+    # =====================================================
+
+    with tab1:
+
+        st.subheader("➕ Nuevo Soporte/Mantenimiento")
+
+        desarrollos_df = obtener_tareas()
+
+        lista_desarrollos = []
+
+        if not desarrollos_df.empty:
+            lista_desarrollos = desarrollos_df["nombre"].dropna().unique().tolist()
+
+        desarrolladores_df = obtener_desarrolladores()
+
+        lista_devs = []
+
+        if not desarrolladores_df.empty:
+            lista_devs = desarrolladores_df["nombre"].dropna().unique().tolist()
+
+        with st.form("form_soporte"):
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                fecha_ingreso = st.date_input(
+                    "📅 Fecha ingreso"
+                )
+
+                fecha_entrega = st.date_input(
+                    "📅 Fecha entrega"
+                )
+
+                horas_empleadas = st.number_input(
+                    "⏱️ Horas empleadas",
+                    min_value=0.0,
+                    step=0.5
+                )
+
+                celula = st.text_input(
+                    "🏢 Célula"
+                )
+
+            with col2:
+
+                desarrollador = st.selectbox(
+                    "👨‍💻 Desarrollador",
+                    lista_devs
+                )
+
+                nombre_desarrollo = st.selectbox(
+                    "📦 Desarrollo",
+                    lista_desarrollos
+                )
+
+                tipo_soporte = st.selectbox(
+                    "🛠️ Tipo soporte",
+                    [
+                        "Correctivo",
+                        "Preventivo",
+                        "Mejora",
+                        "Ajuste",
+                        "Urgente"
+                    ]
+                )
+
+                estado = st.selectbox(
+                    "📌 Estado",
+                    [
+                        "Pendiente",
+                        "En Proceso",
+                        "Finalizado"
+                    ]
+                )
+
+            descripcion = st.text_area(
+                "📝 Descripción del mantenimiento",
+                height=120
+            )
+
+            observaciones = st.text_area(
+                "📋 Observaciones",
+                height=100
+            )
+
+            guardar_soporte = st.form_submit_button(
+                "💾 Guardar Soporte",
+                use_container_width=True
+            )
+
+        # GUARDAR SOPORTE
+        if guardar_soporte:
+
+            datos = {
+                "fecha_ingreso": str(fecha_ingreso),
+                "fecha_entrega": str(fecha_entrega),
+                "horas_empleadas": horas_empleadas,
+                "celula": celula,
+                "desarrollador": desarrollador,
+                "nombre_desarrollo": nombre_desarrollo,
+                "tipo_soporte": tipo_soporte,
+                "estado": estado,
+                "descripcion": descripcion,
+                "observaciones": observaciones
+            }
+
+            if crear_soporte(datos):
+
+                st.success("✅ Soporte registrado correctamente")
+                st.balloons()
+                st.rerun()
+
+            else:
+                st.error("❌ Error registrando soporte")
+
+    # =====================================================
+    # TAB 2 - HISTORIAL
+    # =====================================================
+
+    with tab2:
+
+        st.subheader("📋 Historial de Soportes")
+
+        if soportes_df.empty:
+
+            st.info("📭 No hay soportes registrados")
+
+        else:
+
+            for _, soporte in soportes_df.iterrows():
+
+                st.markdown(f"""
+                <div style="
+                    background-color:#1e1e1e;
+                    padding:20px;
+                    border-radius:18px;
+                    margin-bottom:15px;
+                    border:1px solid #333;
+                    box-shadow:0px 2px 10px rgba(0,0,0,0.2);
+                ">
+
+                <h4 style="color:#00c8ff;">
+                    🛠️ {soporte['nombre_desarrollo']}
+                </h4>
+
+                <p><b>👨‍💻 Desarrollador:</b> {soporte['desarrollador']}</p>
+
+                <p><b>🏢 Célula:</b> {soporte['celula']}</p>
+
+                <p><b>📌 Estado:</b> {soporte['estado']}</p>
+
+                <p><b>🛠️ Tipo:</b> {soporte['tipo_soporte']}</p>
+
+                <p><b>⏱️ Horas:</b> {soporte['horas_empleadas']}</p>
+
+                <p><b>📅 Ingreso:</b> {soporte['fecha_ingreso']}</p>
+
+                <p><b>📅 Entrega:</b> {soporte['fecha_entrega']}</p>
+
+                <p><b>📝 Descripción:</b><br>
+                {soporte['descripcion']}</p>
+
+                <p><b>📋 Observaciones:</b><br>
+                {soporte['observaciones']}</p>
+
+                </div>
+                """, unsafe_allow_html=True)
+
+                col1, col2, col3 = st.columns([5,1,1])
+
+                with col3:
+
+                    if st.button(
+                        f"🗑️ Eliminar {soporte['id']}",
+                        key=f"eliminar_soporte_{soporte['id']}"
+                    ):
+
+                        if eliminar_soporte(soporte['id']):
+
+                            st.success("✅ Soporte eliminado")
+                            st.rerun()
+
+                        else:
+                            st.error("❌ Error eliminando soporte")
+                            
+# =====================================================
+# SOPORTES / MANTENIMIENTOS
+# =====================================================
+
+elif menu == "🛠️ Soportes":
+
+    st.markdown(
+        '<h1 class="main-header">🛠️ Soportes / Mantenimientos</h1>',
+        unsafe_allow_html=True
+    )
+
+    df_soportes = obtener_soportes()
+
+
+
 # -------------------------
 # NUEVA TAREA
 # -------------------------
