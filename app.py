@@ -897,38 +897,46 @@ if menu == "📊 Dashboard":
             )
         
         with col_f2:
-            sprints_unicos = ['Todos'] + sorted(df['sprint'].dropna().unique().tolist())
-            filtro_sprint = st.multiselect(
-                "Sprint",
-                sprints_unicos,
-                key="dash_sprint"
-            )
-        
-        with col_f3:
-            categorias_unicas = ['Todos'] + sorted(df['categoria'].dropna().unique().tolist())
-            filtro_categoria = st.multiselect(
-                "Categoría",
-                categorias_unicas,
-                key="dash_categoria"
-            )
-        
-        with col_f4:
-            celulas_unicas = ['Todos'] + sorted(df['celula'].dropna().unique().tolist())
-            filtro_celula = st.multiselect(
-                "Célula",
-                celulas_unicas,
-                key="dash_celula"
-            )
-        
-        with col_f5:
-            devs_unicos = ['Todos'] + sorted(df['desarrolladores'].dropna().unique().tolist())
-            filtro_dev = st.multiselect(
-                "Desarrollador",
-                devs_unicos,
-                key="dash_dev"
+            sprints_unicos = sorted(
+                df['sprint'].dropna().unique().tolist()
             )
 
-        
+            filtro_sprint = st.multiselect(
+                "Sprint",
+                sprints_unicos
+            )
+
+        with col_f3:
+            categorias_unicas = sorted(
+                df['categoria'].dropna().unique().tolist()
+            )
+
+            filtro_categoria = st.multiselect(
+                "Categoría",
+                categorias_unicas
+            )
+
+        with col_f4:
+            celulas_unicas = sorted(
+                df['celula'].dropna().unique().tolist()
+            )
+
+            filtro_celula = st.multiselect(
+                "Célula",
+                celulas_unicas
+            )
+
+        with col_f5:
+
+            devs_unicos = sorted(
+                df['desarrolladores'].dropna().unique().tolist()
+            )
+
+            filtro_dev = st.multiselect(
+                "Desarrollador",
+                devs_unicos
+            )
+                
         # -------------------------
         # DATAFRAME BASE
         # -------------------------
@@ -936,39 +944,59 @@ if menu == "📊 Dashboard":
         df_filtrado = df.copy()
         
         # -------------------------
-        # FILTROS MULTISELECT
+        # FILTRO DESARROLLADORES
         # -------------------------
 
         if filtro_dev:
+
             patron = "|".join(filtro_dev)
 
             df_filtrado = df_filtrado[
-                df_filtrado['desarrolladores'].str.contains(
-                    patron,
-                    na=False
-                )
+                df_filtrado['desarrolladores']
+                .fillna("")
+                .str.contains(patron, case=False)
             ]
 
+        # -------------------------
+        # FILTRO ESTADO
+        # -------------------------
+
         if filtro_estado:
+
             df_filtrado = df_filtrado[
                 df_filtrado['estado'].isin(filtro_estado)
             ]
 
+        # -------------------------
+        # FILTRO SPRINT
+        # -------------------------
+
         if filtro_sprint:
+
             df_filtrado = df_filtrado[
                 df_filtrado['sprint'].isin(filtro_sprint)
             ]
 
+        # -------------------------
+        # FILTRO CATEGORÍA
+        # -------------------------
+
         if filtro_categoria:
+
             df_filtrado = df_filtrado[
                 df_filtrado['categoria'].isin(filtro_categoria)
             ]
 
+        # -------------------------
+        # FILTRO CÉLULA
+        # -------------------------
+
         if filtro_celula:
+
             df_filtrado = df_filtrado[
                 df_filtrado['celula'].isin(filtro_celula)
             ]
-        
+       
         # -------------------------
         # MÉTRICAS PRINCIPALES (ACTUALIZADAS CON FILTROS)
         # -------------------------
@@ -1222,12 +1250,11 @@ elif menu == "📝 Gestión de Tareas":
                     key="id_estado"
                 )
 
-            with col_e2:
-                nuevo_estado = st.selectbox(
-                    "Nuevo estado",
-                    [ESTADOS_TAREA],
-                    key="nuevo_estado"
-                )
+            nuevo_estado = st.selectbox(
+                "Nuevo estado",
+                ESTADOS_TAREA,
+                key="nuevo_estado"
+            )
 
             with col_e3:
                 st.markdown("<br>", unsafe_allow_html=True)
