@@ -196,6 +196,20 @@ key = os.getenv("SUPABASE_KEY")
 supabase = create_client(url, key)
 
 # -------------------------
+# ESTADOS OFICIALES
+# -------------------------
+
+ESTADOS_TAREA = [
+    "Backlog",
+    "Asignado",
+    "En proceso",
+    "Terminado",
+    "Descartado"
+]
+
+
+
+# -------------------------
 # FUNCIONES DB
 # -------------------------
 
@@ -375,7 +389,7 @@ def actualizar_estado(id, estado):
         }
 
         # registrar inicio
-        if estado == "En Proceso":
+        if estado == "En proceso":
             data_update["fecha_inicio"] = datetime.now().isoformat()
 
         supabase.table("desarrollos").update(data_update).eq("id", id).execute()
@@ -876,45 +890,84 @@ if menu == "📊 Dashboard":
         
         with col_f1:
             estados_unicos = ['Todos'] + sorted(df['estado'].unique().tolist())
-            filtro_estado = st.selectbox("Estado", estados_unicos, key="dash_estado")
+            filtro_estado = st.multiselect(
+                "Estado",
+                estados_unicos,
+                key="dash_estado"
+            )
         
         with col_f2:
             sprints_unicos = ['Todos'] + sorted(df['sprint'].dropna().unique().tolist())
-            filtro_sprint = st.selectbox("Sprint", sprints_unicos, key="dash_sprint")
+            filtro_sprint = st.multiselect(
+                "Sprint",
+                sprints_unicos,
+                key="dash_sprint"
+            )
         
         with col_f3:
             categorias_unicas = ['Todos'] + sorted(df['categoria'].dropna().unique().tolist())
-            filtro_categoria = st.selectbox("Categoría", categorias_unicas, key="dash_categoria")
+            filtro_categoria = st.multiselect(
+                "Categoría",
+                categorias_unicas,
+                key="dash_categoria"
+            )
         
         with col_f4:
             celulas_unicas = ['Todos'] + sorted(df['celula'].dropna().unique().tolist())
-            filtro_celula = st.selectbox("Célula", celulas_unicas, key="dash_celula")
+            filtro_celula = st.multiselect(
+                "Célula",
+                celulas_unicas,
+                key="dash_celula"
+            )
         
         with col_f5:
             devs_unicos = ['Todos'] + sorted(df['desarrolladores'].dropna().unique().tolist())
-            filtro_dev = st.selectbox("Desarrollador", devs_unicos, key="dash_dev")
+            filtro_dev = st.multiselect(
+                "Desarrollador",
+                devs_unicos,
+                key="dash_dev"
+            )
+
         
-        # Aplicar filtros
+        # -------------------------
+        # DATAFRAME BASE
+        # -------------------------
+
         df_filtrado = df.copy()
         
-        if filtro_dev != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['desarrolladores'].str.contains(filtro_dev, na=False)]
-        
-        if filtro_estado != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['estado'] == filtro_estado]
-        
-        if filtro_sprint != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['sprint'] == filtro_sprint]
-        
-        if filtro_categoria != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['categoria'] == filtro_categoria]
-        
-        if filtro_celula != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['celula'] == filtro_celula]
-        
-        st.markdown(f"**Mostrando {len(df_filtrado)} de {len(df)} tareas**")
-        
-        st.divider()
+        # -------------------------
+        # FILTROS MULTISELECT
+        # -------------------------
+
+        if filtro_dev:
+            patron = "|".join(filtro_dev)
+
+            df_filtrado = df_filtrado[
+                df_filtrado['desarrolladores'].str.contains(
+                    patron,
+                    na=False
+                )
+            ]
+
+        if filtro_estado:
+            df_filtrado = df_filtrado[
+                df_filtrado['estado'].isin(filtro_estado)
+            ]
+
+        if filtro_sprint:
+            df_filtrado = df_filtrado[
+                df_filtrado['sprint'].isin(filtro_sprint)
+            ]
+
+        if filtro_categoria:
+            df_filtrado = df_filtrado[
+                df_filtrado['categoria'].isin(filtro_categoria)
+            ]
+
+        if filtro_celula:
+            df_filtrado = df_filtrado[
+                df_filtrado['celula'].isin(filtro_celula)
+            ]
         
         # -------------------------
         # MÉTRICAS PRINCIPALES (ACTUALIZADAS CON FILTROS)
@@ -1023,8 +1076,13 @@ elif menu == "📝 Gestión de Tareas":
         col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
         
         with col_f1:
-            estados_unicos = ['Todos'] + sorted(df['estado'].unique().tolist())
-            filtro_estado = st.selectbox("Estado", estados_unicos)
+            estados_unicos = sorted(
+                df['estado'].dropna().unique().tolist()
+            )
+            filtro_estado = st.multiselect(
+                "Estado",
+                estados_unicos
+            )
         
         with col_f2:
             sprints_unicos = ['Todos'] + sorted(df['sprint'].dropna().unique().tolist())
@@ -1046,28 +1104,46 @@ elif menu == "📝 Gestión de Tareas":
                 "Desarrollador",
                 devs_unicos
             )
-                
-        # Aplicar filtros
+        
+        # -------------------------
+        # DATAFRAME BASE
+        # -------------------------
+
         df_filtrado = df.copy()
 
-        if filtro_dev != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['desarrolladores'].str.contains(filtro_dev)]
-        
-        if filtro_estado != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['estado'] == filtro_estado]
-        
-        if filtro_sprint != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['sprint'] == filtro_sprint]
-        
-        if filtro_categoria != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['categoria'] == filtro_categoria]
-        
-        if filtro_celula != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['celula'] == filtro_celula]
-        
-        st.markdown(f"**Mostrando {len(df_filtrado)} de {len(df)} tareas**")
-        
-        st.divider()
+        # -------------------------
+        # FILTROS MULTISELECT
+        # -------------------------
+
+        if filtro_dev:
+            patron = "|".join(filtro_dev)
+
+            df_filtrado = df_filtrado[
+                df_filtrado['desarrolladores'].str.contains(
+                    patron,
+                    na=False
+                )
+            ]
+
+        if filtro_estado:
+            df_filtrado = df_filtrado[
+                df_filtrado['estado'].isin(filtro_estado)
+            ]
+
+        if filtro_sprint:
+            df_filtrado = df_filtrado[
+                df_filtrado['sprint'].isin(filtro_sprint)
+            ]
+
+        if filtro_categoria:
+            df_filtrado = df_filtrado[
+                df_filtrado['categoria'].isin(filtro_categoria)
+            ]
+
+        if filtro_celula:
+            df_filtrado = df_filtrado[
+                df_filtrado['celula'].isin(filtro_celula)
+            ]
         
         # Tabla con filtros por columna usando columnas personalizadas
         st.subheader("📋 Lista de Tareas")
@@ -1149,7 +1225,7 @@ elif menu == "📝 Gestión de Tareas":
             with col_e2:
                 nuevo_estado = st.selectbox(
                     "Nuevo estado",
-                    ["Backlog", "En progreso", "Terminado"],
+                    [ESTADOS_TAREA],
                     key="nuevo_estado"
                 )
 
