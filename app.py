@@ -875,36 +875,44 @@ def obtener_soportes():
 # CREAR SOPORTE
 # =====================================================
 
-def crear_soporte(datos):
+def crear_soporte(
+    fecha_ingreso,
+    fecha_entrega,
+    horas_empleadas,
+    celula,
+    desarrollador,
+    desarrollo,
+    tipo_soporte,
+    prioridad,
+    estado,
+    descripcion,
+    observaciones
+):
 
     try:
 
-        supabase.table(
-            "soportes_mantenimiento"
-        ).insert({
+        datos = {
+            "fecha_ingreso": str(fecha_ingreso),
+            "fecha_entrega": str(fecha_entrega),
+            "horas_empleadas": horas_empleadas,
+            "celula": celula,
+            "desarrollador": desarrollador,
+            "desarrollo": desarrollo,
+            "tipo_soporte": tipo_soporte,
+            "prioridad": prioridad,
+            "estado": estado,
+            "descripcion": descripcion,
+            "observaciones": observaciones
+        }
 
-            "fecha_ingreso": datos["fecha_ingreso"],
-            "fecha_entrega": datos["fecha_entrega"],
-            "horas_empleadas": datos["horas_empleadas"],
-            "célula": datos["celula"],
-            "desarrollador": datos["desarrollador"],
-            "desarrollo": datos["nombre_desarrollo"],
-            "tipo_soporte": datos["tipo_soporte"],
-            "Prioridad": datos["prioridad"],
-            "estado": datos["estado"],
-            "descripción": datos["descripcion"],
-            "observaciones": datos["observaciones"]
-
-        }).execute()
+        supabase.table("soportes_mantenimiento").insert(datos).execute()
 
         return True
 
     except Exception as e:
-
         st.error(f"❌ Error creando soporte: {e}")
-
         return False
-    
+
 # =====================================================
 # ELIMINAR SOPORTE
 # =====================================================
@@ -2224,7 +2232,7 @@ elif menu == "🛠️ Soportes":
                     lista_devs
                 )
 
-                nombre_desarrollo = st.selectbox(
+                desarrollo = st.selectbox(
                     "📦 Desarrollo",
                     lista_desarrollos
                 )
@@ -2276,22 +2284,22 @@ elif menu == "🛠️ Soportes":
         # GUARDAR SOPORTE
         if guardar_soporte:
 
-            datos = {
+            ok = crear_soporte(
 
-                "fecha_ingreso": str(fecha_ingreso),
-                "fecha_entrega": str(fecha_entrega),
-                "horas_empleadas": horas_empleadas,
-                "celula": celula,
-                "desarrollador": desarrollador,
-                "nombre_desarrollo": nombre_desarrollo,
-                "tipo_soporte": tipo_soporte,
-                "prioridad": prioridad,
-                "estado": estado,
-                "descripcion": descripcion,
-                "observaciones": observaciones
-            }
+                fecha_ingreso,
+                fecha_entrega,
+                horas_empleadas,
+                celula,
+                desarrollador,
+                desarrollo,
+                tipo_soporte,
+                prioridad,
+                estado,
+                descripcion,
+                observaciones
+            )
 
-            if crear_soporte(datos):
+            if ok:
 
                 st.success("✅ Soporte registrado correctamente")
                 st.balloons()
@@ -2327,7 +2335,7 @@ elif menu == "🛠️ Soportes":
                 ">
 
                 <h4 style="color:#00c8ff;">
-                    🛠️ {soporte['nombre_desarrollo']}
+                    🛠️ {soporte['desarrollo']}
                 </h4>
 
                 <p><b>👨‍💻 Desarrollador:</b> {soporte['desarrollador']}</p>
