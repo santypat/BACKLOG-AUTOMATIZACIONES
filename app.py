@@ -1090,94 +1090,199 @@ if menu == "📊 Dashboard":
 # GESTIÓN DE TAREAS
 # -------------------------
 
+# -------------------------
+# GESTIÓN DE TAREAS
+# -------------------------
+
 elif menu == "📝 Gestión de Tareas":
-    st.markdown('<h1 class="main-header">📝 Gestión de Tareas</h1>', unsafe_allow_html=True)
-    
+
+    st.markdown(
+        '<h1 class="main-header">📝 Gestión de Tareas</h1>',
+        unsafe_allow_html=True
+    )
+
+    # -------------------------
+    # ESTADOS DEL SISTEMA
+    # -------------------------
+
+    ESTADOS_TAREA = [
+        "Backlog",
+        "Asignado",
+        "En Proceso",
+        "Terminado",
+        "Descartado"
+    ]
+
     df = obtener_tareas()
-    
+
     if df.empty:
+
         st.info("📭 No hay tareas registradas.")
+
     else:
-        # Filtros avanzados
+
+        # =========================================================
+        # FILTROS
+        # =========================================================
+
         st.subheader("🔍 Filtros")
-        
+
         col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
-        
+
+        # ---------------- ESTADO ----------------
         with col_f1:
+
             estados_unicos = sorted(
-                df['estado'].dropna().unique().tolist()
+                df['estado']
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
             )
+
             filtro_estado = st.multiselect(
                 "Estado",
-                estados_unicos
+                estados_unicos,
+                placeholder="Todos"
             )
-        
+
+        # ---------------- SPRINT ----------------
         with col_f2:
-            sprints_unicos = ['Todos'] + sorted(df['sprint'].dropna().unique().tolist())
-            filtro_sprint = st.selectbox("Sprint", sprints_unicos)
-        
+
+            sprints_unicos = sorted(
+                df['sprint']
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+
+            filtro_sprint = st.multiselect(
+                "Sprint",
+                sprints_unicos,
+                placeholder="Todos"
+            )
+
+        # ---------------- CATEGORIA ----------------
         with col_f3:
-            categorias_unicas = ['Todos'] + sorted(df['categoria'].dropna().unique().tolist())
-            filtro_categoria = st.selectbox("Categoría", categorias_unicas)
-        
+
+            categorias_unicas = sorted(
+                df['categoria']
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+
+            filtro_categoria = st.multiselect(
+                "Categoría",
+                categorias_unicas,
+                placeholder="Todos"
+            )
+
+        # ---------------- CELULA ----------------
         with col_f4:
-            celulas_unicas = ['Todos'] + sorted(df['celula'].dropna().unique().tolist())
-            filtro_celula = st.selectbox("Célula", celulas_unicas)
-        
+
+            celulas_unicas = sorted(
+                df['celula']
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+
+            filtro_celula = st.multiselect(
+                "Célula",
+                celulas_unicas,
+                placeholder="Todos"
+            )
+
+        # ---------------- DESARROLLADOR ----------------
         with col_f5:
 
-            devs_unicos = ['Todos'] + sorted(df['desarrolladores'].dropna().unique().tolist())
-
-            filtro_dev = st.selectbox(
-                "Desarrollador",
-                devs_unicos
+            devs_unicos = sorted(
+                df['desarrolladores']
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
             )
-        
-        # -------------------------
+
+            filtro_dev = st.multiselect(
+                "Desarrollador",
+                devs_unicos,
+                placeholder="Todos"
+            )
+
+        # =========================================================
         # DATAFRAME BASE
-        # -------------------------
+        # =========================================================
 
         df_filtrado = df.copy()
 
-        # -------------------------
+        # =========================================================
         # FILTROS MULTISELECT
-        # -------------------------
+        # =========================================================
 
+        # ---------------- DESARROLLADORES ----------------
         if filtro_dev:
+
             patron = "|".join(filtro_dev)
 
             df_filtrado = df_filtrado[
-                df_filtrado['desarrolladores'].str.contains(
+                df_filtrado['desarrolladores']
+                .fillna("")
+                .str.contains(
                     patron,
+                    case=False,
                     na=False
                 )
             ]
 
+        # ---------------- ESTADO ----------------
         if filtro_estado:
+
             df_filtrado = df_filtrado[
-                df_filtrado['estado'].isin(filtro_estado)
+                df_filtrado['estado']
+                .astype(str)
+                .isin(filtro_estado)
             ]
 
+        # ---------------- SPRINT ----------------
         if filtro_sprint:
+
             df_filtrado = df_filtrado[
-                df_filtrado['sprint'].isin(filtro_sprint)
+                df_filtrado['sprint']
+                .astype(str)
+                .isin(filtro_sprint)
             ]
 
+        # ---------------- CATEGORIA ----------------
         if filtro_categoria:
+
             df_filtrado = df_filtrado[
-                df_filtrado['categoria'].isin(filtro_categoria)
+                df_filtrado['categoria']
+                .astype(str)
+                .isin(filtro_categoria)
             ]
 
+        # ---------------- CELULA ----------------
         if filtro_celula:
+
             df_filtrado = df_filtrado[
-                df_filtrado['celula'].isin(filtro_celula)
+                df_filtrado['celula']
+                .astype(str)
+                .isin(filtro_celula)
             ]
-        
-        # Tabla con filtros por columna usando columnas personalizadas
+
+        # =========================================================
+        # TABLA
+        # =========================================================
+
         st.subheader("📋 Lista de Tareas")
-        
-        # Preparar dataframe para mostrar
+
         df_display = df_filtrado[[
+
             'id',
             'Prioridad',
             'nombre',
@@ -1192,26 +1297,28 @@ elif menu == "📝 Gestión de Tareas":
             'puntos',
             'analista',
             'fecha'
+
         ]].copy()
-                
-        # Renombrar columnas para mejor visualización
+
         df_display.columns = [
-                'ID',
-                'Prioridad',
-                'Nombre',
-                'Equipo',
-                'Estado',
-                'Sprint',
-                'Horas/Mes',
-                'Horas Opt.',
-                'Ahorro',
-                'Categoría',
-                'Célula',
-                'Puntos',
-                'Analista',
-                'Fecha'
+
+            'ID',
+            'Prioridad',
+            'Nombre',
+            'Equipo',
+            'Estado',
+            'Sprint',
+            'Horas/Mes',
+            'Horas Opt.',
+            'Ahorro',
+            'Categoría',
+            'Célula',
+            'Puntos',
+            'Analista',
+            'Fecha'
+
         ]
-        
+
         tabla_html = generar_tabla_con_tooltips(
             df_display,
             df_filtrado
@@ -1222,27 +1329,36 @@ elif menu == "📝 Gestión de Tareas":
             height=550,
             scrolling=True
         )
-        
+
         st.divider()
-        
-        # Acciones sobre tareas
+
+        # =========================================================
+        # ACCIONES
+        # =========================================================
+
         st.subheader("⚡ Acciones Rápidas")
 
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+
             "🔄 Cambiar Estado",
             "👥 Reasignar Equipo",
             "🚦 Reasignar Prioridad",
             "✅ Finalizar Tarea",
             "✏️ Editar Tarea",
             "🗑️ Eliminar Tareas"
+
         ])
 
-        # TAB 1: Cambiar Estado
+        # =========================================================
+        # TAB 1: CAMBIAR ESTADO
+        # =========================================================
+
         with tab1:
 
             col_e1, col_e2, col_e3 = st.columns([2,2,1])
 
             with col_e1:
+
                 id_estado = st.number_input(
                     "ID de la tarea",
                     min_value=1,
@@ -1250,33 +1366,49 @@ elif menu == "📝 Gestión de Tareas":
                     key="id_estado"
                 )
 
-            nuevo_estado = st.selectbox(
-                "Nuevo estado",
-                ESTADOS_TAREA,
-                key="nuevo_estado"
-            )
+            with col_e2:
+
+                nuevo_estado = st.selectbox(
+                    "Nuevo estado",
+                    ESTADOS_TAREA,
+                    key="nuevo_estado"
+                )
 
             with col_e3:
+
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                if st.button("🔄 Actualizar", use_container_width=True):
+                if st.button(
+                    "🔄 Actualizar",
+                    use_container_width=True
+                ):
 
                     if id_estado in df['id'].values:
 
-                        if actualizar_estado(id_estado, nuevo_estado):
-                            st.success(f"✅ Estado actualizado a '{nuevo_estado}'")
+                        if actualizar_estado(
+                            id_estado,
+                            nuevo_estado
+                        ):
+
+                            st.success(
+                                f"✅ Estado actualizado a '{nuevo_estado}'"
+                            )
+
                             st.rerun()
 
                     else:
                         st.error("❌ ID no encontrado")
 
+        # =========================================================
+        # TAB 2: REASIGNAR EQUIPO
+        # =========================================================
 
-        # TAB 2: Reasignar Equipo
         with tab2:
 
             col_r1, col_r2, col_r3 = st.columns([1,2,1])
 
             with col_r1:
+
                 id_reasignar = st.number_input(
                     "ID de la tarea",
                     min_value=1,
@@ -1297,6 +1429,7 @@ elif menu == "📝 Gestión de Tareas":
                     )
 
                 else:
+
                     st.warning("No hay desarrolladores disponibles")
                     nuevos_devs = []
 
@@ -1304,24 +1437,35 @@ elif menu == "📝 Gestión de Tareas":
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                if st.button("👥 Reasignar", use_container_width=True):
+                if st.button(
+                    "👥 Reasignar",
+                    use_container_width=True
+                ):
 
                     if id_reasignar in df['id'].values:
 
                         if nuevos_devs:
 
-                            if reasignar_desarrolladores(id_reasignar, nuevos_devs):
+                            if reasignar_desarrolladores(
+                                id_reasignar,
+                                nuevos_devs
+                            ):
+
                                 st.success("✅ Equipo reasignado")
                                 st.rerun()
 
                         else:
-                            st.error("❌ Debes seleccionar al menos un desarrollador")
+                            st.error(
+                                "❌ Debes seleccionar al menos un desarrollador"
+                            )
 
                     else:
                         st.error("❌ ID no encontrado")
 
+                # =========================================================
+        # TAB 3: REASIGNAR PRIORIDAD
+        # =========================================================
 
-        # TAB 3: Reasignar Prioridad
         with tab3:
 
             col_p1, col_p2, col_p3 = st.columns([2,2,1])
@@ -1335,17 +1479,22 @@ elif menu == "📝 Gestión de Tareas":
                     key="id_prioridad"
                 )
 
-            # obtener prioridad actual de la tarea
             tarea = df[df["id"] == id_prioridad]
 
             if not tarea.empty:
-                prioridad_actual = str(tarea.iloc[0]["prioridad"]).upper()
+                prioridad_actual = str(
+                    tarea.iloc[0]["prioridad"]
+                ).upper()
             else:
                 prioridad_actual = "MEDIA"
 
             with col_p2:
 
-                prioridades = ["URGENTE", "MEDIA", "BAJA"]
+                prioridades = [
+                    "URGENTE",
+                    "MEDIA",
+                    "BAJA"
+                ]
 
                 if prioridad_actual not in prioridades:
                     prioridad_actual = "MEDIA"
@@ -1353,33 +1502,49 @@ elif menu == "📝 Gestión de Tareas":
                 nueva_prioridad = st.selectbox(
                     "Prioridad",
                     prioridades,
-                    index=prioridades.index(prioridad_actual)
+                    index=prioridades.index(
+                        prioridad_actual
+                    )
                 )
 
             with col_p3:
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                if st.button("🚦 Actualizar Prioridad", use_container_width=True):
+                if st.button(
+                    "🚦 Actualizar Prioridad",
+                    use_container_width=True
+                ):
 
                     if id_prioridad in df['id'].values:
 
-                        if actualizar_prioridad(id_prioridad, nueva_prioridad):
-                            st.success(f"✅ Prioridad actualizada a {nueva_prioridad}")
+                        if actualizar_prioridad(
+                            id_prioridad,
+                            nueva_prioridad
+                        ):
+
+                            st.success(
+                                f"✅ Prioridad actualizada a {nueva_prioridad}"
+                            )
+
                             st.rerun()
 
                     else:
                         st.error("❌ ID no encontrado")
 
+        # =========================================================
+        # TAB 4: FINALIZAR TAREA
+        # =========================================================
 
-        # TAB 4: Finalizar Tarea
         with tab4:
 
-            st.markdown("**Complete los datos de finalización:**")
+            st.markdown(
+                "**Complete los datos de finalización:**"
+            )
 
-            col_f1, col_f2 = st.columns([1,2])
+            col_fin1, col_fin2 = st.columns([1,2])
 
-            with col_f1:
+            with col_fin1:
 
                 id_finalizar = st.number_input(
                     "ID de la tarea",
@@ -1388,9 +1553,15 @@ elif menu == "📝 Gestión de Tareas":
                     key="id_finalizar"
                 )
 
-                tarea_actual = df[df['id'] == id_finalizar]
+                tarea_actual = df[
+                    df['id'] == id_finalizar
+                ]
 
-                max_horas = int(tarea_actual['horas_mes'].values[0]) if not tarea_actual.empty else 1000
+                max_horas = (
+                    int(tarea_actual['horas_mes'].values[0])
+                    if not tarea_actual.empty
+                    else 1000
+                )
 
                 horas_optimizadas = st.number_input(
                     "Horas Optimizadas/Mes",
@@ -1399,36 +1570,54 @@ elif menu == "📝 Gestión de Tareas":
                     value=0
                 )
 
-            with col_f2:
+            with col_fin2:
 
                 descripcion_auto = st.text_area(
                     "Descripción de la Automatización",
                     height=150
                 )
 
-                if st.button("✅ Finalizar Tarea", type="primary", use_container_width=True):
+                if st.button(
+                    "✅ Finalizar Tarea",
+                    type="primary",
+                    use_container_width=True
+                ):
 
                     if id_finalizar in df['id'].values:
 
                         if descripcion_auto.strip():
 
-                            if finalizar_tarea(id_finalizar, horas_optimizadas, descripcion_auto):
+                            if finalizar_tarea(
+                                id_finalizar,
+                                horas_optimizadas,
+                                descripcion_auto
+                            ):
 
-                                ahorro = max_horas - horas_optimizadas
+                                ahorro = (
+                                    max_horas
+                                    - horas_optimizadas
+                                )
 
-                                st.success(f"✅ Tarea finalizada! Ahorro: {ahorro} horas/mes")
+                                st.success(
+                                    f"✅ Tarea finalizada! "
+                                    f"Ahorro: {ahorro} horas/mes"
+                                )
+
                                 st.balloons()
                                 st.rerun()
 
                         else:
-                            st.error("❌ La descripción es obligatoria")
+                            st.error(
+                                "❌ La descripción es obligatoria"
+                            )
 
                     else:
                         st.error("❌ ID no encontrado")
 
-
-    
+        # =========================================================
         # TAB 5: EDITAR TAREA
+        # =========================================================
+
         with tab5:
 
             st.subheader("✏️ Editar Desarrollo")
@@ -1439,33 +1628,56 @@ elif menu == "📝 Gestión de Tareas":
                 step=1
             )
 
-            tarea_df = df[df["id"] == id_editar]
+            tarea_df = df[
+                df["id"] == id_editar
+            ]
 
             if not tarea_df.empty:
 
                 tarea = tarea_df.iloc[0]
 
-                prioridades = ["URGENTE", "MEDIA", "BAJA"]
-                prioridad_actual = str(tarea.get("prioridad", "MEDIA")).upper()
+                prioridades = [
+                    "URGENTE",
+                    "MEDIA",
+                    "BAJA"
+                ]
+
+                prioridad_actual = str(
+                    tarea.get("prioridad", "MEDIA")
+                ).upper()
 
                 if prioridad_actual not in prioridades:
                     prioridad_actual = "MEDIA"
 
-                # -------- MANEJO SEGURO DE FECHAS --------
+                # =================================================
+                # FECHAS SEGURAS
+                # =================================================
 
-                fecha_inicio_val = tarea.get("fecha_inicio")
+                fecha_inicio_val = tarea.get(
+                    "fecha_inicio"
+                )
+
                 if pd.isna(fecha_inicio_val):
                     fecha_inicio_val = datetime.today()
                 else:
-                    fecha_inicio_val = pd.to_datetime(fecha_inicio_val)
+                    fecha_inicio_val = pd.to_datetime(
+                        fecha_inicio_val
+                    )
 
-                fecha_fin_val = tarea.get("fecha_fin")
+                fecha_fin_val = tarea.get(
+                    "fecha_fin"
+                )
+
                 if pd.isna(fecha_fin_val):
                     fecha_fin_val = datetime.today()
                 else:
-                    fecha_fin_val = pd.to_datetime(fecha_fin_val)
+                    fecha_fin_val = pd.to_datetime(
+                        fecha_fin_val
+                    )
 
-                # -------- FORMULARIO --------
+                # =================================================
+                # FORMULARIO
+                # =================================================
 
                 with st.form("form_editar_tarea"):
 
@@ -1475,57 +1687,106 @@ elif menu == "📝 Gestión de Tareas":
 
                         nombre = st.text_input(
                             "Nombre del desarrollo",
-                            value=tarea.get("nombre", "")
+                            value=tarea.get(
+                                "nombre",
+                                ""
+                            )
                         )
 
                         celula = st.text_input(
                             "Célula",
-                            value=tarea.get("celula", "")
+                            value=tarea.get(
+                                "celula",
+                                ""
+                            )
                         )
 
                         prioridad = st.selectbox(
                             "Prioridad",
                             prioridades,
-                            index=prioridades.index(prioridad_actual)
+                            index=prioridades.index(
+                                prioridad_actual
+                            )
+                        )
+
+                        estado_actual = str(
+                            tarea.get(
+                                "estado",
+                                "Backlog"
+                            )
+                        )
+
+                        if estado_actual not in ESTADOS_TAREA:
+                            estado_actual = "Backlog"
+
+                        estado = st.selectbox(
+                            "Estado",
+                            ESTADOS_TAREA,
+                            index=ESTADOS_TAREA.index(
+                                estado_actual
+                            )
                         )
 
                         horas_mes = st.number_input(
                             "Horas Mes",
                             min_value=0,
-                            value=int(tarea.get("horas_mes") or 0)
+                            value=int(
+                                tarea.get(
+                                    "horas_mes"
+                                ) or 0
+                            )
                         )
 
                         puntos = st.number_input(
                             "Puntos",
                             min_value=0,
-                            value=int(tarea.get("puntos") or 0)
+                            value=int(
+                                tarea.get(
+                                    "puntos"
+                                ) or 0
+                            )
                         )
 
                     with col2:
 
                         analista = st.text_input(
                             "Analista",
-                            value=tarea.get("analista", "")
+                            value=tarea.get(
+                                "analista",
+                                ""
+                            )
                         )
 
                         categoria = st.text_input(
                             "Categoría",
-                            value=tarea.get("categoria", "")
+                            value=tarea.get(
+                                "categoria",
+                                ""
+                            )
                         )
 
                         frecuencia = st.text_input(
                             "Frecuencia",
-                            value=tarea.get("frecuencia", "")
+                            value=tarea.get(
+                                "frecuencia",
+                                ""
+                            )
                         )
 
                         sprint = st.text_input(
                             "Sprint",
-                            value=tarea.get("sprint", "")
+                            value=tarea.get(
+                                "sprint",
+                                ""
+                            )
                         )
 
                     descripcion = st.text_area(
                         "Descripción del desarrollo",
-                        value=tarea.get("descripcion_desarrollo", "")
+                        value=tarea.get(
+                            "descripcion_desarrollo",
+                            ""
+                        )
                     )
 
                     fecha_inicio = st.date_input(
@@ -1539,23 +1800,40 @@ elif menu == "📝 Gestión de Tareas":
                     )
 
                     desarrolladores = st.text_input(
-                        "Desarrolladores (separados por coma)",
-                        value=tarea.get("desarrolladores", "")
+                        "Desarrolladores "
+                        "(separados por coma)",
+                        value=tarea.get(
+                            "desarrolladores",
+                            ""
+                        )
                     )
 
-                    guardar = st.form_submit_button("💾 Guardar Cambios")
+                    guardar = st.form_submit_button(
+                        "💾 Guardar Cambios"
+                    )
 
-                # -------- GUARDAR CAMBIOS --------
+                # =================================================
+                # GUARDAR CAMBIOS
+                # =================================================
 
                 if guardar:
-                    devs = [x.strip() for x in desarrolladores.split(",") if x.strip()]
-                    
+
+                    devs = [
+                        x.strip()
+                        for x in desarrolladores.split(",")
+                        if x.strip()
+                    ]
+
                     try:
-                        # 1. Actualizar datos del desarrollo
-                        supabase.table("desarrollos").update({
+
+                        supabase.table(
+                            "desarrollos"
+                        ).update({
+
                             "nombre": nombre,
                             "celula": celula,
                             "prioridad": prioridad,
+                            "estado": estado,
                             "horas_mes": horas_mes,
                             "puntos": puntos,
                             "analista": analista,
@@ -1563,38 +1841,74 @@ elif menu == "📝 Gestión de Tareas":
                             "frecuencia": frecuencia,
                             "sprint": sprint,
                             "descripcion_desarrollo": descripcion,
-                            "fecha_inicio": str(fecha_inicio),
-                            "fecha_fin": str(fecha_fin)
-                            # ✅ ELIMINADA la línea de desarrolladores
-                        }).eq("id", id_editar).execute()
-                        
-                        # 2. Actualizar desarrolladores usando la tabla relacional
+                            "fecha_inicio": str(
+                                fecha_inicio
+                            ),
+                            "fecha_fin": str(
+                                fecha_fin
+                            )
+
+                        }).eq(
+                            "id",
+                            id_editar
+                        ).execute()
+
                         if devs:
-                            reasignar_desarrolladores(id_editar, devs)
-                        
-                        st.success("✅ Desarrollo actualizado correctamente")
+
+                            reasignar_desarrolladores(
+                                id_editar,
+                                devs
+                            )
+
+                        st.success(
+                            "✅ Desarrollo actualizado correctamente"
+                        )
+
                         st.rerun()
 
                     except Exception as e:
-                        st.error(f"❌ Error al actualizar el desarrollo: {e}")
 
-                else:
-                    st.info("Introduce un ID válido para editar la tarea")
-                
+                        st.error(
+                            f"❌ Error al actualizar "
+                            f"el desarrollo: {e}"
+                        )
 
-        # TAB 6: Eliminar Tareas
+            else:
+
+                st.info(
+                    "Introduce un ID válido "
+                    "para editar la tarea"
+                )
+
+        # =========================================================
+        # TAB 6: ELIMINAR TAREAS
+        # =========================================================
+
         with tab6:
 
-            st.markdown("### 🗑️ Eliminación Masiva de Tareas")
+            st.markdown(
+                "### 🗑️ Eliminación Masiva de Tareas"
+            )
 
             opciones_tareas = df_filtrado.apply(
-                lambda row: f"ID {row['id']} - {row['nombre']} ({row['estado']})",
+
+                lambda row:
+                f"ID {row['id']} - "
+                f"{row['nombre']} "
+                f"({row['estado']})",
+
                 axis=1
+
             ).tolist()
 
             tareas_ids = df_filtrado['id'].tolist()
 
-            opciones_dict = dict(zip(opciones_tareas, tareas_ids))
+            opciones_dict = dict(
+                zip(
+                    opciones_tareas,
+                    tareas_ids
+                )
+            )
 
             tareas_seleccionadas = st.multiselect(
                 "Selecciona las tareas a eliminar:",
@@ -1603,21 +1917,128 @@ elif menu == "📝 Gestión de Tareas":
 
             if tareas_seleccionadas:
 
-                ids_a_eliminar = [opciones_dict[tarea] for tarea in tareas_seleccionadas]
+                ids_a_eliminar = [
+
+                    opciones_dict[tarea]
+                    for tarea in tareas_seleccionadas
+
+                ]
 
                 col_del1, col_del2 = st.columns([3,1])
 
                 with col_del1:
-                    st.error(f"⚠️ Vas a eliminar {len(ids_a_eliminar)} tarea(s)")
+
+                    st.error(
+                        f"⚠️ Vas a eliminar "
+                        f"{len(ids_a_eliminar)} tarea(s)"
+                    )
 
                 with col_del2:
 
-                    if st.button("🗑️ Confirmar Eliminación", type="primary", use_container_width=True):
+                    if st.button(
+                        "🗑️ Confirmar Eliminación",
+                        type="primary",
+                        use_container_width=True
+                    ):
 
-                        if eliminar_tareas_multiples(ids_a_eliminar):
+                        if eliminar_tareas_multiples(
+                            ids_a_eliminar
+                        ):
 
-                            st.success(f"✅ {len(ids_a_eliminar)} tarea(s) eliminada(s)")
+                            st.success(
+                                f"✅ {len(ids_a_eliminar)} "
+                                f"tarea(s) eliminada(s)"
+                            )
+
                             st.rerun()
+        
+        # =========================================================
+        # FUNCION SUGERIDA PARA ACTUALIZAR ESTADO
+        # =========================================================
+
+        def actualizar_estado(id_tarea, nuevo_estado):
+
+            try:
+
+                # -------------------------------------------------
+                # VALIDAR ESTADOS
+                # -------------------------------------------------
+
+                estados_validos = [
+                    "Backlog",
+                    "Asignado",
+                    "En Proceso",
+                    "Terminado",
+                    "Descartado"
+                ]
+
+                if nuevo_estado not in estados_validos:
+                    return False
+
+                # -------------------------------------------------
+                # FECHA INICIO
+                # -------------------------------------------------
+
+                update_data = {
+                    "estado": nuevo_estado
+                }
+
+                # Si pasa a En Proceso y no tiene fecha inicio
+                if nuevo_estado == "En Proceso":
+
+                    tarea = supabase.table(
+                        "desarrollos"
+                    ).select(
+                        "fecha_inicio"
+                    ).eq(
+                        "id",
+                        id_tarea
+                    ).execute()
+
+                    if tarea.data:
+
+                        fecha_inicio_actual = tarea.data[0].get(
+                            "fecha_inicio"
+                        )
+
+                        if not fecha_inicio_actual:
+
+                            update_data["fecha_inicio"] = str(
+                                datetime.now().date()
+                            )
+
+                # -------------------------------------------------
+                # FECHA FINAL
+                # -------------------------------------------------
+
+                if nuevo_estado == "Terminado":
+
+                    update_data["fecha_fin"] = str(
+                        datetime.now().date()
+                    )
+
+                # -------------------------------------------------
+                # ACTUALIZAR
+                # -------------------------------------------------
+
+                supabase.table(
+                    "desarrollos"
+                ).update(
+                    update_data
+                ).eq(
+                    "id",
+                    id_tarea
+                ).execute()
+
+                return True
+
+            except Exception as e:
+
+                st.error(
+                    f"❌ Error actualizando estado: {e}"
+                )
+
+                return False
 # -------------------------
 # NUEVA TAREA
 # -------------------------
