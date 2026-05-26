@@ -2326,7 +2326,7 @@ elif menu == "🛠️ Soportes":
 
                 st.markdown(f"""
                 <div style="
-                    background-color:#1e1e1e;
+                    background-color:#FEFFC7;
                     padding:20px;
                     border-radius:18px;
                     margin-bottom:15px;
