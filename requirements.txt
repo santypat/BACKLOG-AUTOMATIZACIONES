@@ -1,5 +1,5 @@
-streamlit
-pandas
-openpyxl
-plotly
-supabase
+streamlit==1.61.1
+pandas==3.0.5
+openpyxl==3.1.5
+plotly==6.9.0
+supabase==2.31.0
