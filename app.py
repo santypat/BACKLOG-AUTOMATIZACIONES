@@ -950,12 +950,13 @@ df_sidebar = obtener_tareas()
 st.sidebar.metric("Total de Tareas", len(df_sidebar))
 if not df_sidebar.empty:
     st.sidebar.metric("Tareas Activas", len(df_sidebar[df_sidebar['estado'] != 'Terminado']))
+    df_sidebar_terminadas = df_sidebar[df_sidebar["estado"] == "Terminado"]
     ahorro_sidebar = max(
-        int(df_sidebar["horas_mes"].sum())
-        - int(df_sidebar["horas_optimizadas"].sum()),
+        int(df_sidebar_terminadas["horas_mes"].sum())
+        - int(df_sidebar_terminadas["horas_optimizadas"].sum()),
         0,
     )
-    st.sidebar.metric("Horas Ahorradas/Mes", ahorro_sidebar)
+    st.sidebar.metric("Horas Ahorradas/Mes (terminadas)", ahorro_sidebar)
 
 # -------------------------
 # DASHBOARD
@@ -1093,8 +1094,9 @@ if menu == "📊 Dashboard":
         col1, col2, col3, col4 = st.columns(4)
 
         total_tareas = len(df_filtrado)
-        total_horas_mes = int(df_filtrado["horas_mes"].sum())
-        total_horas_opt = int(df_filtrado["horas_optimizadas"].sum())
+        df_metricas = df_filtrado[df_filtrado["estado"] == "Terminado"]
+        total_horas_mes = int(df_metricas["horas_mes"].sum())
+        total_horas_opt = int(df_metricas["horas_optimizadas"].sum())
         ahorro_total = max(total_horas_mes - total_horas_opt, 0)
         porcentaje_ahorro = (
             (ahorro_total / total_horas_mes) * 100
@@ -1103,17 +1105,17 @@ if menu == "📊 Dashboard":
         )
 
         col1.metric("📦 Total Tareas", total_tareas)
-        col2.metric("⏱️ Horas antes / mes", f"{total_horas_mes:,}")
-        col3.metric("⚙️ Horas después / mes", f"{total_horas_opt:,}")
+        col2.metric("⏱️ Horas antes / mes (terminadas)", f"{total_horas_mes:,}")
+        col3.metric("⚙️ Horas después / mes (terminadas)", f"{total_horas_opt:,}")
         col4.metric(
-            "🚀 Ahorro mensual",
+            "🚀 Ahorro mensual realizado",
             f"{ahorro_total:,}",
             delta=f"{porcentaje_ahorro:.1f}%",
         )
 
         st.divider()
 
-        st.subheader("📊 Comparación Horas Manuales vs Optimizadas")
+        st.subheader("📊 Impacto de proyectos terminados")
 
         # valores para la gráfica
         df_grafico = pd.DataFrame({
@@ -1126,7 +1128,7 @@ if menu == "📊 Dashboard":
             x="Tipo",
             y="Horas",
             text="Horas",
-            title="Impacto de Automatización",
+            title="Impacto de Automatización — Proyectos terminados",
         )
 
         fig.update_traces(textposition="outside")
