@@ -9,7 +9,14 @@ import io
 import re
 import plotly.express as px
 
-from backlog_domain import ESTADOS_TAREA, normalizar_estado
+from backlog_domain import (
+    CELULAS,
+    ESTADOS_TAREA,
+    guardar_nombre_soporte,
+    interpretar_nombre_soporte,
+    normalizar_celula,
+    normalizar_estado,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +46,7 @@ def actualizar_tarea(datos, devs):
         supabase.table("desarrollos").update({
 
             "nombre": datos[0],
-            "celula": datos[1],
+            "celula": normalizar_celula(datos[1]),
             "horas_mes": datos[2],
             "horas_optimizadas": datos[3],
             "descripcion_desarrollo": datos[4],
@@ -273,7 +280,7 @@ def insertar_tarea(datos, devs):
             "nombre": datos[0],
             "prioridad": datos[1],
             "descripcion_desarrollo": datos[2],
-            "celula": datos[3],
+            "celula": normalizar_celula(datos[3]),
             "horas_mes": datos[4],
             "horas_optimizadas": datos[5],
             "descripcion": datos[6],
@@ -329,6 +336,9 @@ def obtener_tareas():
 
         if "estado" in df.columns:
             df["estado"] = df["estado"].apply(normalizar_estado)
+
+        if "celula" in df.columns:
+            df["celula"] = df["celula"].apply(normalizar_celula)
 
         # Aplicar semaforización de prioridad
         if "prioridad" in df.columns:
@@ -814,7 +824,7 @@ def crear_plantilla_excel():
             "Automatización terminada correctamente"
         ],
 
-        "celula": ["Backend"],
+        "celula": ["TECNOLOGIA"],
 
         "horas_mes": [40],
 
@@ -866,7 +876,10 @@ def obtener_soportes():
         data = response.data
 
         if data:
-            return pd.DataFrame(data)
+            df = pd.DataFrame(data)
+            if "celula" in df.columns:
+                df["celula"] = df["celula"].apply(normalizar_celula)
+            return df
 
         return pd.DataFrame()
 
@@ -900,7 +913,7 @@ def crear_soporte(
             "fecha_ingreso": str(fecha_ingreso),
             "fecha_entrega": str(fecha_entrega),
             "horas_empleadas": horas_empleadas,
-            "celula": celula,
+            "celula": normalizar_celula(celula),
             "desarrollador": desarrollador,
             "desarrollo": desarrollo,
             "tipo_soporte": tipo_soporte,
@@ -1935,12 +1948,16 @@ elif menu == "📝 Gestión de Tareas":
                             )
                         )
 
-                        celula = st.text_input(
+                        celula_actual = normalizar_celula(
+                            tarea.get("celula", "")
+                        )
+                        if celula_actual not in CELULAS:
+                            celula_actual = "TRANSVERSALES"
+
+                        celula = st.selectbox(
                             "Célula",
-                            value=tarea.get(
-                                "celula",
-                                ""
-                            )
+                            CELULAS,
+                            index=CELULAS.index(celula_actual),
                         )
 
                         prioridad = st.selectbox(
@@ -2155,14 +2172,27 @@ elif menu == "🛠️ Soportes":
         lista_desarrollos = []
 
         if not desarrollos_df.empty:
-            lista_desarrollos = desarrollos_df["nombre"].dropna().unique().tolist()
+            lista_desarrollos = sorted(
+                desarrollos_df["nombre"].dropna().unique().tolist()
+            )
 
         desarrolladores_df = obtener_desarrolladores()
 
         lista_devs = []
 
         if not desarrolladores_df.empty:
-            lista_devs = desarrolladores_df["nombre"].dropna().unique().tolist()
+            lista_devs = sorted(
+                desarrolladores_df["nombre"].dropna().unique().tolist()
+            )
+
+        es_automatizacion = st.toggle(
+            "¿El soporte es de una automatización?",
+            value=True,
+            help=(
+                "Actívalo para relacionar el soporte con un desarrollo del "
+                "backlog. Desactívalo para registrar un soporte independiente."
+            ),
+        )
 
         with st.form("form_soporte"):
 
@@ -2184,8 +2214,9 @@ elif menu == "🛠️ Soportes":
                     step=0.5
                 )
 
-                celula = st.text_input(
-                    "🏢 Célula"
+                celula = st.selectbox(
+                    "🏢 Célula",
+                    CELULAS,
                 )
 
             with col2:
@@ -2195,10 +2226,18 @@ elif menu == "🛠️ Soportes":
                     lista_devs
                 )
 
-                desarrollo = st.selectbox(
-                    "📦 Desarrollo",
-                    lista_desarrollos
-                )
+                if es_automatizacion:
+                    nombre_registro = st.selectbox(
+                        "📦 Desarrollo relacionado",
+                        lista_desarrollos,
+                        index=None,
+                        placeholder="Selecciona un desarrollo",
+                    )
+                else:
+                    nombre_registro = st.text_input(
+                        "🛠️ Nombre del soporte",
+                        placeholder="Ej: Ajuste de archivo operativo",
+                    )
 
                 tipo_soporte = st.selectbox(
                     "🛠️ Tipo soporte",
@@ -2247,29 +2286,40 @@ elif menu == "🛠️ Soportes":
         # GUARDAR SOPORTE
         if guardar_soporte:
 
-            ok = crear_soporte(
-
-                fecha_ingreso,
-                fecha_entrega,
-                horas_empleadas,
-                celula,
-                desarrollador,
-                desarrollo,
-                tipo_soporte,
-                prioridad,
-                estado,
-                descripcion,
-                observaciones
-            )
-
-            if ok:
-
-                st.success("✅ Soporte registrado correctamente")
-                st.balloons()
-                st.rerun()
-
+            if not desarrollador:
+                st.error("❌ Selecciona un desarrollador")
+            elif not nombre_registro:
+                st.error(
+                    "❌ Selecciona un desarrollo o ingresa el nombre del soporte"
+                )
+            elif fecha_entrega < fecha_ingreso:
+                st.error("❌ La fecha de entrega no puede ser anterior al ingreso")
             else:
-                st.error("❌ Error registrando soporte")
+                referencia_soporte = guardar_nombre_soporte(
+                    nombre_registro,
+                    es_automatizacion,
+                )
+
+                ok = crear_soporte(
+                    fecha_ingreso,
+                    fecha_entrega,
+                    horas_empleadas,
+                    celula,
+                    desarrollador,
+                    referencia_soporte,
+                    tipo_soporte,
+                    prioridad,
+                    estado,
+                    descripcion,
+                    observaciones,
+                )
+
+                if ok:
+                    st.success("✅ Soporte registrado correctamente")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("❌ Error registrando soporte")
 
     # =====================================================
     # TAB 2 - HISTORIAL
@@ -2285,7 +2335,60 @@ elif menu == "🛠️ Soportes":
 
         else:
 
-            for _, soporte in soportes_df.iterrows():
+            soportes_filtrados = soportes_df.copy()
+            fechas_soporte = pd.to_datetime(
+                soportes_filtrados["fecha_ingreso"],
+                errors="coerce",
+            ).dt.date
+            fechas_validas = fechas_soporte.dropna()
+
+            col_fecha, col_dev = st.columns(2)
+
+            with col_fecha:
+                if not fechas_validas.empty:
+                    rango_fechas = st.date_input(
+                        "📅 Rango de fechas de ingreso",
+                        value=(fechas_validas.min(), fechas_validas.max()),
+                    )
+                else:
+                    rango_fechas = ()
+
+            with col_dev:
+                opciones_devs = sorted(
+                    soportes_filtrados["desarrollador"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
+                filtro_devs = st.multiselect(
+                    "👨‍💻 Desarrollador",
+                    opciones_devs,
+                )
+
+            if isinstance(rango_fechas, (tuple, list)) and len(rango_fechas) == 2:
+                fecha_desde, fecha_hasta = rango_fechas
+                soportes_filtrados = soportes_filtrados[
+                    fechas_soporte.between(fecha_desde, fecha_hasta)
+                ]
+
+            if filtro_devs:
+                soportes_filtrados = soportes_filtrados[
+                    soportes_filtrados["desarrollador"].isin(filtro_devs)
+                ]
+
+            st.caption(
+                f"{len(soportes_filtrados)} soporte(s) encontrado(s)"
+            )
+
+            if soportes_filtrados.empty:
+                st.info("📭 No hay soportes para los filtros seleccionados")
+
+            for _, soporte in soportes_filtrados.iterrows():
+
+                titulo_soporte, soporte_es_automatizacion = (
+                    interpretar_nombre_soporte(soporte.get("desarrollo"))
+                )
 
                 soporte_seguro = {
                     campo: texto_seguro(soporte.get(campo))
@@ -2302,6 +2405,11 @@ elif menu == "🛠️ Soportes":
                         "observaciones",
                     ]
                 }
+                soporte_seguro["titulo"] = texto_seguro(titulo_soporte)
+                soporte_seguro["origen"] = (
+                    "Automatización" if soporte_es_automatizacion
+                    else "Soporte independiente"
+                )
 
                 st.markdown(f"""
                 <div style="
@@ -2314,8 +2422,10 @@ elif menu == "🛠️ Soportes":
                 ">
 
                 <h4 style="color:#00c8ff;">
-                    🛠️ {soporte_seguro['desarrollo']}
+                    🛠️ {soporte_seguro['titulo']}
                 </h4>
+
+                <p><b>🔗 Origen:</b> {soporte_seguro['origen']}</p>
 
                 <p><b>👨‍💻 Desarrollador:</b> {soporte_seguro['desarrollador']}</p>
 
@@ -2367,9 +2477,9 @@ elif menu == "➕ Nueva Tarea":
                     ["URGENTE","MEDIA","BAJA"]
                 )
 
-                celula = st.text_input(
+                celula = st.selectbox(
                     "Célula*",
-                    placeholder="Ej: Backend, Frontend, Data"
+                    CELULAS,
                 )
                 
                 analista = st.text_input(
