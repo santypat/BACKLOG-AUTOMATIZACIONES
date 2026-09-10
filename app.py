@@ -11,10 +11,16 @@ import plotly.express as px
 
 from backlog_domain import (
     CELULAS,
+    DOCUMENTACION_TIPO,
     ESTADOS_TAREA,
+    FECHA_ESTIMADA_TIPO,
+    codificar_detalle_documentacion,
     es_estado_soporte_valido,
     guardar_nombre_soporte,
+    guardar_referencia_desarrollo,
+    interpretar_detalle_documentacion,
     interpretar_nombre_soporte,
+    interpretar_referencia_desarrollo,
     normalizar_celula,
     normalizar_estado,
     normalizar_estado_soporte,
@@ -318,6 +324,13 @@ def insertar_tarea(datos, devs):
                     "dev_id": dev_id
                 }).execute()
 
+        guardar_fecha_estimada(
+            desarrollo_id,
+            datos[14],
+            datos[3],
+            devs[0] if devs else datos[10],
+        )
+
         invalidar_cache(obtener_tareas)
 
         return True
@@ -388,6 +401,9 @@ def obtener_tareas():
 
         # Calcular horas restantes
         df["horas_restantes"] = df["horas_mes"] - df["horas_optimizadas"]
+
+        fechas_estimadas = obtener_fechas_estimadas()
+        df["fecha_estimada_entrega"] = df["id"].map(fechas_estimadas)
 
      
         # Ordenar por prioridad (URGENTE → MEDIA → BAJA) y luego por ID
@@ -880,6 +896,12 @@ def obtener_soportes():
 
         if data:
             df = pd.DataFrame(data)
+            if "tipo_soporte" in df.columns:
+                df = df[
+                    ~df["tipo_soporte"].isin(
+                        [DOCUMENTACION_TIPO, FECHA_ESTIMADA_TIPO]
+                    )
+                ].copy()
             if "celula" in df.columns:
                 df["celula"] = df["celula"].apply(normalizar_celula)
             if "estado" in df.columns:
@@ -963,6 +985,159 @@ def actualizar_estado_soporte(soporte_id, estado):
     except Exception as e:
         mostrar_error_usuario("No fue posible actualizar el soporte", e)
         return False
+
+
+# =====================================================
+# DOCUMENTACIÓN Y FECHA ESTIMADA
+# =====================================================
+
+def _datos_registro_documental(
+    tipo_registro,
+    desarrollo_id,
+    celula,
+    desarrollador,
+    titulo,
+    detalle,
+):
+    hoy = datetime.now().strftime("%Y-%m-%d")
+    return {
+        "fecha_ingreso": hoy,
+        "fecha_entrega": hoy,
+        "horas_empleadas": 0,
+        "celula": normalizar_celula(celula),
+        "desarrollador": desarrollador,
+        "desarrollo": guardar_referencia_desarrollo(desarrollo_id),
+        "tipo_soporte": tipo_registro,
+        "prioridad": "BAJA",
+        "estado": "Finalizado",
+        "descripcion": str(titulo or "").strip(),
+        "observaciones": detalle,
+    }
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def obtener_fechas_estimadas():
+    try:
+        response = supabase.table("soportes_mantenimiento").select(
+            "desarrollo, descripcion"
+        ).eq("tipo_soporte", FECHA_ESTIMADA_TIPO).execute()
+
+        fechas = {}
+        for registro in response.data or []:
+            desarrollo_id = interpretar_referencia_desarrollo(
+                registro.get("desarrollo")
+            )
+            if desarrollo_id is not None:
+                fechas[desarrollo_id] = registro.get("descripcion")
+        return fechas
+
+    except Exception as e:
+        logger.exception("No fue posible cargar fechas estimadas: %s", e)
+        return {}
+
+
+def guardar_fecha_estimada(
+    desarrollo_id,
+    fecha_estimada,
+    celula,
+    desarrollador,
+):
+    referencia = guardar_referencia_desarrollo(desarrollo_id)
+    fecha_texto = str(fecha_estimada)
+    datos = _datos_registro_documental(
+        FECHA_ESTIMADA_TIPO,
+        desarrollo_id,
+        celula,
+        desarrollador,
+        fecha_texto,
+        "Fecha estimada de entrega del desarrollo",
+    )
+
+    try:
+        existente = supabase.table("soportes_mantenimiento").select(
+            "id"
+        ).eq("tipo_soporte", FECHA_ESTIMADA_TIPO).eq(
+            "desarrollo", referencia
+        ).limit(1).execute()
+
+        if existente.data:
+            supabase.table("soportes_mantenimiento").update(datos).eq(
+                "id", existente.data[0]["id"]
+            ).execute()
+        else:
+            supabase.table("soportes_mantenimiento").insert(datos).execute()
+
+        invalidar_cache(obtener_fechas_estimadas, obtener_tareas)
+        return True
+
+    except Exception as e:
+        mostrar_error_usuario("No fue posible guardar la fecha estimada", e)
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def obtener_documentaciones():
+    try:
+        response = supabase.table("soportes_mantenimiento").select(
+            "*"
+        ).eq("tipo_soporte", DOCUMENTACION_TIPO).order(
+            "id", desc=True
+        ).execute()
+
+        registros = []
+        for registro in response.data or []:
+            desarrollo_id = interpretar_referencia_desarrollo(
+                registro.get("desarrollo")
+            )
+            if desarrollo_id is None:
+                continue
+            contenido, enlace = interpretar_detalle_documentacion(
+                registro.get("observaciones")
+            )
+            registro = dict(registro)
+            registro["desarrollo_id"] = desarrollo_id
+            registro["contenido"] = contenido
+            registro["enlace"] = enlace
+            registro["celula"] = normalizar_celula(registro.get("celula"))
+            registros.append(registro)
+
+        return pd.DataFrame(registros)
+
+    except Exception as e:
+        mostrar_error_usuario("No fue posible cargar las documentaciones", e)
+        return pd.DataFrame()
+
+
+def crear_documentacion(
+    tarea,
+    desarrollador,
+    titulo,
+    contenido,
+    enlace="",
+):
+    if not str(titulo or "").strip():
+        st.error("El título de la documentación es obligatorio")
+        return False
+    if not str(contenido or "").strip() and not str(enlace or "").strip():
+        st.error("Agrega contenido o un enlace para la documentación")
+        return False
+
+    datos = _datos_registro_documental(
+        DOCUMENTACION_TIPO,
+        int(tarea["id"]),
+        tarea.get("celula", ""),
+        desarrollador,
+        titulo,
+        codificar_detalle_documentacion(contenido, enlace),
+    )
+
+    try:
+        supabase.table("soportes_mantenimiento").insert(datos).execute()
+        invalidar_cache(obtener_documentaciones, obtener_soportes)
+        return True
+    except Exception as e:
+        mostrar_error_usuario("No fue posible guardar la documentación", e)
+        return False
 # -------------------------
 # SIDEBAR
 # -------------------------
@@ -976,6 +1151,7 @@ menu = st.sidebar.selectbox(
         "📝 Gestión de Tareas",
         "➕ Nueva Tarea",
         "🛠️ Soportes",
+        "📚 Documentaciones",
         "👨‍💻 Desarrolladores",
         "📥 Importar Excel",
         "📤 Exportar Excel"
@@ -1581,6 +1757,7 @@ elif menu == "📝 Gestión de Tareas":
             'celula',
             'puntos',
             'analista',
+            'fecha_estimada_entrega',
             'fecha'
 
         ]].copy()
@@ -1600,6 +1777,7 @@ elif menu == "📝 Gestión de Tareas":
             'Célula',
             'Puntos',
             'Analista',
+            'Fecha estimada de entrega',
             'Fecha'
 
         ]
@@ -1827,6 +2005,13 @@ elif menu == "📝 Gestión de Tareas":
                 "**Complete los datos de finalización:**"
             )
 
+            autores_documentacion_df = obtener_desarrolladores()
+            autores_documentacion = (
+                autores_documentacion_df["nombre"].dropna().tolist()
+                if not autores_documentacion_df.empty
+                else ["Sin asignar"]
+            )
+
             col_fin1, col_fin2 = st.columns([1,2])
 
             with col_fin1:
@@ -1862,6 +2047,31 @@ elif menu == "📝 Gestión de Tareas":
                     height=150
                 )
 
+                st.markdown("#### 📚 Documentación de cierre (opcional)")
+                autor_documentacion = st.selectbox(
+                    "Responsable de la documentación",
+                    autores_documentacion,
+                    key="autor_documentacion_cierre",
+                )
+                titulo_documentacion = st.text_input(
+                    "Título de la documentación",
+                    value="Documentación de cierre",
+                    key="titulo_documentacion_cierre",
+                )
+                contenido_documentacion = st.text_area(
+                    "Contenido de la documentación",
+                    placeholder=(
+                        "Describe funcionamiento, instalación, dependencias, "
+                        "operación y consideraciones importantes."
+                    ),
+                    key="contenido_documentacion_cierre",
+                )
+                enlace_documentacion = st.text_input(
+                    "Enlace a archivo o recurso (opcional)",
+                    placeholder="https://drive.google.com/...",
+                    key="enlace_documentacion_cierre",
+                )
+
                 if st.button(
                     "✅ Finalizar Tarea",
                     type="primary",
@@ -1878,6 +2088,19 @@ elif menu == "📝 Gestión de Tareas":
                                 descripcion_auto
                             ):
 
+                                documentacion_ok = True
+                                if (
+                                    contenido_documentacion.strip()
+                                    or enlace_documentacion.strip()
+                                ):
+                                    documentacion_ok = crear_documentacion(
+                                        tarea_actual.iloc[0].to_dict(),
+                                        autor_documentacion,
+                                        titulo_documentacion,
+                                        contenido_documentacion,
+                                        enlace_documentacion,
+                                    )
+
                                 ahorro = (
                                     max_horas
                                     - horas_optimizadas
@@ -1888,8 +2111,9 @@ elif menu == "📝 Gestión de Tareas":
                                     f"Ahorro: {ahorro} horas/mes"
                                 )
 
-                                st.balloons()
-                                st.rerun()
+                                if documentacion_ok:
+                                    st.balloons()
+                                    st.rerun()
 
                         else:
                             st.error(
@@ -1960,6 +2184,23 @@ elif menu == "📝 Gestión de Tareas":
                     fecha_fin_val = pd.to_datetime(
                         fecha_fin_val
                     )
+
+                fecha_estimada_val = tarea.get(
+                    "fecha_estimada_entrega"
+                )
+                if pd.isna(fecha_estimada_val):
+                    fecha_estimada_val = datetime.today().date()
+                else:
+                    fecha_estimada_val = pd.to_datetime(
+                        fecha_estimada_val
+                    ).date()
+
+                autores_edicion_df = obtener_desarrolladores()
+                autores_edicion = (
+                    autores_edicion_df["nombre"].dropna().tolist()
+                    if not autores_edicion_df.empty
+                    else ["Sin asignar"]
+                )
 
                 # =================================================
                 # FORMULARIO
@@ -2089,6 +2330,11 @@ elif menu == "📝 Gestión de Tareas":
                         value=fecha_fin_val
                     )
 
+                    fecha_estimada = st.date_input(
+                        "Fecha estimada de entrega",
+                        value=fecha_estimada_val,
+                    )
+
                     desarrolladores = st.text_input(
                         "Desarrolladores "
                         "(separados por coma)",
@@ -2096,6 +2342,27 @@ elif menu == "📝 Gestión de Tareas":
                             "desarrolladores",
                             ""
                         )
+                    )
+
+                    st.markdown("#### 📚 Documentación adicional (opcional)")
+                    autor_doc_edicion = st.selectbox(
+                        "Responsable de la documentación",
+                        autores_edicion,
+                        key=f"autor_doc_edicion_{id_editar}",
+                    )
+                    titulo_doc_edicion = st.text_input(
+                        "Título de la documentación",
+                        value="Actualización de documentación",
+                        key=f"titulo_doc_edicion_{id_editar}",
+                    )
+                    contenido_doc_edicion = st.text_area(
+                        "Contenido de la documentación",
+                        key=f"contenido_doc_edicion_{id_editar}",
+                    )
+                    enlace_doc_edicion = st.text_input(
+                        "Enlace a archivo o recurso (opcional)",
+                        placeholder="https://drive.google.com/...",
+                        key=f"enlace_doc_edicion_{id_editar}",
                     )
 
                     guardar = st.form_submit_button(
@@ -2150,13 +2417,35 @@ elif menu == "📝 Gestión de Tareas":
                                 devs
                             )
 
-                        invalidar_cache(obtener_tareas)
-
-                        st.success(
-                            "✅ Desarrollo actualizado correctamente"
+                        guardar_fecha_estimada(
+                            id_editar,
+                            fecha_estimada,
+                            celula,
+                            devs[0] if devs else analista,
                         )
 
-                        st.rerun()
+                        documentacion_ok = True
+                        if (
+                            contenido_doc_edicion.strip()
+                            or enlace_doc_edicion.strip()
+                        ):
+                            documentacion_ok = crear_documentacion(
+                                {
+                                    "id": id_editar,
+                                    "celula": celula,
+                                },
+                                autor_doc_edicion,
+                                titulo_doc_edicion,
+                                contenido_doc_edicion,
+                                enlace_doc_edicion,
+                            )
+
+                        invalidar_cache(obtener_tareas)
+
+                        st.success("✅ Desarrollo actualizado correctamente")
+
+                        if documentacion_ok:
+                            st.rerun()
 
                     except Exception as e:
 
@@ -2679,6 +2968,12 @@ elif menu == "➕ Nueva Tarea":
                     "Frecuencia de Ejecución*",
                     placeholder="Ej: Diaria, Semanal, Mensual"
                 )
+
+                fecha_estimada_entrega = st.date_input(
+                    "Fecha estimada de entrega*",
+                    value=datetime.today().date(),
+                    min_value=datetime.today().date(),
+                )
             
             st.markdown("---")
             
@@ -2709,7 +3004,8 @@ elif menu == "➕ Nueva Tarea":
                         analista,                                  # 10
                         categoria,                                 # 11
                         frecuencia,                                # 12
-                        sprint                                     # 13
+                        sprint,                                    # 13
+                        fecha_estimada_entrega                     # 14
                     )
                     
                     if insertar_tarea(datos, devs_sel):
@@ -2718,6 +3014,215 @@ elif menu == "➕ Nueva Tarea":
                         st.rerun()
                     
                   
+
+# -------------------------
+# DOCUMENTACIONES
+# -------------------------
+
+elif menu == "📚 Documentaciones":
+    st.markdown(
+        '<h1 class="main-header">📚 Documentaciones</h1>',
+        unsafe_allow_html=True,
+    )
+
+    tareas_documentacion = obtener_tareas()
+    documentaciones_df = obtener_documentaciones()
+    tab_agregar_doc, tab_consultar_doc = st.tabs([
+        "➕ Agregar documentación",
+        "🔎 Consultar documentaciones",
+    ])
+
+    with tab_agregar_doc:
+        st.subheader("➕ Documentar un desarrollo")
+
+        if tareas_documentacion.empty:
+            st.info("📭 No hay desarrollos disponibles")
+        else:
+            opciones_tareas_doc = {
+                f"#{int(fila['id'])} · {fila['nombre']}": int(fila["id"])
+                for _, fila in tareas_documentacion.iterrows()
+            }
+            desarrolladores_doc_df = obtener_desarrolladores()
+            autores_doc = (
+                desarrolladores_doc_df["nombre"].dropna().tolist()
+                if not desarrolladores_doc_df.empty
+                else ["Sin asignar"]
+            )
+
+            with st.form("form_nueva_documentacion", clear_on_submit=True):
+                desarrollo_doc = st.selectbox(
+                    "Desarrollo relacionado*",
+                    list(opciones_tareas_doc),
+                )
+                desarrollo_doc_id = opciones_tareas_doc[desarrollo_doc]
+                tarea_doc_df = tareas_documentacion[
+                    tareas_documentacion["id"] == desarrollo_doc_id
+                ]
+                tarea_doc = tarea_doc_df.iloc[0].to_dict()
+
+                col_doc_1, col_doc_2 = st.columns(2)
+                with col_doc_1:
+                    autor_doc = st.selectbox(
+                        "Responsable de la documentación*",
+                        autores_doc,
+                    )
+                    titulo_doc = st.text_input(
+                        "Título*",
+                        placeholder="Ej: Manual de instalación y operación",
+                    )
+                with col_doc_2:
+                    st.text_input(
+                        "Célula",
+                        value=str(tarea_doc.get("celula") or ""),
+                        disabled=True,
+                    )
+                    enlace_doc = st.text_input(
+                        "Enlace a archivo o recurso (opcional)",
+                        placeholder="https://drive.google.com/...",
+                    )
+
+                contenido_doc = st.text_area(
+                    "Contenido*",
+                    height=220,
+                    placeholder=(
+                        "Documenta objetivo, funcionamiento, instalación, "
+                        "dependencias, uso, validaciones y recomendaciones."
+                    ),
+                )
+                guardar_doc = st.form_submit_button(
+                    "💾 Guardar documentación",
+                    type="primary",
+                    width="stretch",
+                )
+
+            if guardar_doc:
+                if not titulo_doc.strip() or not contenido_doc.strip():
+                    st.error("❌ El título y el contenido son obligatorios")
+                elif crear_documentacion(
+                    tarea_doc,
+                    autor_doc,
+                    titulo_doc,
+                    contenido_doc,
+                    enlace_doc,
+                ):
+                    st.success("✅ Documentación guardada correctamente")
+                    st.rerun()
+
+    with tab_consultar_doc:
+        st.subheader("🔎 Consultar documentaciones")
+
+        if documentaciones_df.empty:
+            st.info("📭 Aún no hay documentaciones registradas")
+        else:
+            nombres_por_id = tareas_documentacion.set_index("id")[
+                "nombre"
+            ].to_dict()
+            documentaciones_df = documentaciones_df.copy()
+            documentaciones_df["nombre_desarrollo"] = (
+                documentaciones_df["desarrollo_id"].map(nombres_por_id)
+            )
+            documentaciones_df["nombre_desarrollo"] = (
+                documentaciones_df["nombre_desarrollo"].fillna(
+                    documentaciones_df["desarrollo_id"].apply(
+                        lambda valor: f"Desarrollo #{valor}"
+                    )
+                )
+            )
+
+            col_filtro_persona, col_filtro_celula, col_filtro_desarrollo = (
+                st.columns(3)
+            )
+            with col_filtro_persona:
+                filtro_persona_doc = st.selectbox(
+                    "👨‍💻 Persona",
+                    [
+                        "Todas",
+                        *sorted(
+                            documentaciones_df["desarrollador"]
+                            .dropna()
+                            .astype(str)
+                            .unique()
+                            .tolist()
+                        ),
+                    ],
+                )
+            with col_filtro_celula:
+                filtro_celula_doc = st.selectbox(
+                    "🏢 Célula",
+                    [
+                        "Todas",
+                        *sorted(
+                            documentaciones_df["celula"]
+                            .dropna()
+                            .astype(str)
+                            .unique()
+                            .tolist()
+                        ),
+                    ],
+                )
+            with col_filtro_desarrollo:
+                filtro_desarrollo_doc = st.selectbox(
+                    "📦 Desarrollo",
+                    [
+                        "Todos",
+                        *sorted(
+                            documentaciones_df["nombre_desarrollo"]
+                            .dropna()
+                            .astype(str)
+                            .unique()
+                            .tolist()
+                        ),
+                    ],
+                )
+
+            docs_filtradas = documentaciones_df.copy()
+            if filtro_persona_doc != "Todas":
+                docs_filtradas = docs_filtradas[
+                    docs_filtradas["desarrollador"] == filtro_persona_doc
+                ]
+            if filtro_celula_doc != "Todas":
+                docs_filtradas = docs_filtradas[
+                    docs_filtradas["celula"] == filtro_celula_doc
+                ]
+            if filtro_desarrollo_doc != "Todos":
+                docs_filtradas = docs_filtradas[
+                    docs_filtradas["nombre_desarrollo"]
+                    == filtro_desarrollo_doc
+                ]
+
+            st.caption(
+                f"{len(docs_filtradas)} documentación(es) encontrada(s)"
+            )
+
+            if docs_filtradas.empty:
+                st.info("📭 No hay documentación para estos filtros")
+
+            for _, documento in docs_filtradas.iterrows():
+                with st.container(border=True):
+                    st.markdown(
+                        f"#### 📘 {texto_seguro(documento.get('descripcion'))}"
+                    )
+                    st.markdown(
+                        f"**📦 Desarrollo:** "
+                        f"{texto_seguro(documento.get('nombre_desarrollo'))}  \n"
+                        f"**👨‍💻 Responsable:** "
+                        f"{texto_seguro(documento.get('desarrollador'))}  \n"
+                        f"**🏢 Célula:** "
+                        f"{texto_seguro(documento.get('celula'))}  \n"
+                        f"**📅 Registro:** "
+                        f"{texto_seguro(documento.get('fecha_ingreso'))}"
+                    )
+                    st.markdown(
+                        texto_seguro(documento.get("contenido"))
+                        or "Sin contenido textual"
+                    )
+                    enlace_documento = str(documento.get("enlace") or "")
+                    if enlace_documento.startswith(("http://", "https://")):
+                        st.link_button(
+                            "🔗 Abrir archivo o recurso",
+                            enlace_documento,
+                        )
+
 
 # -------------------------
 # DESARROLLADORES

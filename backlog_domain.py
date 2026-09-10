@@ -1,5 +1,6 @@
 """Reglas de negocio independientes de Streamlit y Supabase."""
 
+import json
 import re
 import unicodedata
 
@@ -44,6 +45,9 @@ CELULAS = (
 )
 
 SOPORTE_INDEPENDIENTE_PREFIJO = "__SOPORTE_INDEPENDIENTE__:"
+DOCUMENTACION_TIPO = "__DOCUMENTACION__"
+FECHA_ESTIMADA_TIPO = "__FECHA_ESTIMADA__"
+REFERENCIA_DESARROLLO_PREFIJO = "__DESARROLLO_ID__:"
 
 
 def _clave_texto(valor):
@@ -126,6 +130,48 @@ def interpretar_nombre_soporte(valor):
     if valor.startswith(SOPORTE_INDEPENDIENTE_PREFIJO):
         return valor[len(SOPORTE_INDEPENDIENTE_PREFIJO):].strip(), False
     return valor, True
+
+
+def guardar_referencia_desarrollo(desarrollo_id):
+    """Crea una referencia estable para documentación y metadatos."""
+    return f"{REFERENCIA_DESARROLLO_PREFIJO}{int(desarrollo_id)}"
+
+
+def interpretar_referencia_desarrollo(valor):
+    """Extrae el ID de una referencia documental de desarrollo."""
+    valor = str(valor or "").strip()
+    if not valor.startswith(REFERENCIA_DESARROLLO_PREFIJO):
+        return None
+    try:
+        return int(valor[len(REFERENCIA_DESARROLLO_PREFIJO):])
+    except ValueError:
+        return None
+
+
+def codificar_detalle_documentacion(contenido, enlace=""):
+    """Serializa el contenido documental en una columna de texto existente."""
+    return json.dumps(
+        {
+            "contenido": str(contenido or "").strip(),
+            "enlace": str(enlace or "").strip(),
+        },
+        ensure_ascii=False,
+    )
+
+
+def interpretar_detalle_documentacion(valor):
+    """Lee documentación nueva y conserva compatibilidad con texto histórico."""
+    valor = str(valor or "").strip()
+    try:
+        detalle = json.loads(valor)
+        if isinstance(detalle, dict):
+            return (
+                str(detalle.get("contenido") or "").strip(),
+                str(detalle.get("enlace") or "").strip(),
+            )
+    except (TypeError, ValueError, json.JSONDecodeError):
+        pass
+    return valor, ""
 
 
 def es_estado_valido(estado):

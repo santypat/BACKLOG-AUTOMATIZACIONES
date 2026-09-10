@@ -2,12 +2,17 @@ import unittest
 
 from backlog_domain import (
     CELULAS,
+    DOCUMENTACION_TIPO,
     ESTADOS_SOPORTE,
     ESTADOS_TAREA,
+    codificar_detalle_documentacion,
     es_estado_soporte_valido,
     es_estado_valido,
     guardar_nombre_soporte,
+    guardar_referencia_desarrollo,
+    interpretar_detalle_documentacion,
     interpretar_nombre_soporte,
+    interpretar_referencia_desarrollo,
     normalizar_celula,
     normalizar_estado,
     normalizar_estado_soporte,
@@ -77,5 +82,26 @@ class SoportesTest(unittest.TestCase):
         )
 
 
+class DocumentacionesTest(unittest.TestCase):
+    def test_referencia_estable_de_desarrollo(self):
+        referencia = guardar_referencia_desarrollo(42)
+        self.assertEqual(interpretar_referencia_desarrollo(referencia), 42)
+        self.assertIsNone(interpretar_referencia_desarrollo("Robot"))
+
+    def test_conserva_contenido_y_enlace(self):
+        valor = codificar_detalle_documentacion(
+            "Pasos de instalación",
+            "https://ejemplo.com/manual",
+        )
+        self.assertEqual(
+            interpretar_detalle_documentacion(valor),
+            ("Pasos de instalación", "https://ejemplo.com/manual"),
+        )
+
+    def test_marcador_documental_no_es_un_estado(self):
+        self.assertEqual(DOCUMENTACION_TIPO, "__DOCUMENTACION__")
+
+
 if __name__ == "__main__":
     unittest.main()
+    codificar_detalle_documentacion,
