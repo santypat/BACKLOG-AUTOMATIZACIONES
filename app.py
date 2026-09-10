@@ -12,10 +12,13 @@ import plotly.express as px
 from backlog_domain import (
     CELULAS,
     ESTADOS_TAREA,
+    es_estado_soporte_valido,
     guardar_nombre_soporte,
     interpretar_nombre_soporte,
     normalizar_celula,
     normalizar_estado,
+    normalizar_estado_soporte,
+    soporte_esta_pendiente,
 )
 
 logger = logging.getLogger(__name__)
@@ -879,6 +882,10 @@ def obtener_soportes():
             df = pd.DataFrame(data)
             if "celula" in df.columns:
                 df["celula"] = df["celula"].apply(normalizar_celula)
+            if "estado" in df.columns:
+                df["estado"] = df["estado"].apply(
+                    normalizar_estado_soporte
+                )
             return df
 
         return pd.DataFrame()
@@ -931,6 +938,30 @@ def crear_soporte(
 
     except Exception as e:
         mostrar_error_usuario("No fue posible crear el soporte", e)
+        return False
+
+
+# =====================================================
+# ACTUALIZAR ESTADO DE SOPORTE
+# =====================================================
+
+def actualizar_estado_soporte(soporte_id, estado):
+    estado = normalizar_estado_soporte(estado)
+
+    if not es_estado_soporte_valido(estado):
+        st.error("El estado seleccionado no es válido")
+        return False
+
+    try:
+        supabase.table("soportes_mantenimiento").update({
+            "estado": estado
+        }).eq("id", int(soporte_id)).execute()
+
+        invalidar_cache(obtener_soportes)
+        return True
+
+    except Exception as e:
+        mostrar_error_usuario("No fue posible actualizar el soporte", e)
         return False
 # -------------------------
 # SIDEBAR
@@ -2154,8 +2185,9 @@ elif menu == "🛠️ Soportes":
 
     soportes_df = obtener_soportes()
 
-    tab1, tab2 = st.tabs([
+    tab1, tab2, tab3 = st.tabs([
         "➕ Registrar Soporte",
+        "⏳ Soportes Pendientes",
         "📋 Historial de Soportes"
     ])
 
@@ -2259,14 +2291,8 @@ elif menu == "🛠️ Soportes":
                     ]
                 )
 
-                estado = st.selectbox(
-                    "📌 Estado",
-                    [
-                        "Pendiente",
-                        "En Proceso",
-                        "Finalizado"
-                    ]
-                )
+                estado = "Pendiente"
+                st.info("📌 Estado inicial: Pendiente")
 
             descripcion = st.text_area(
                 "📝 Descripción del mantenimiento",
@@ -2322,10 +2348,139 @@ elif menu == "🛠️ Soportes":
                     st.error("❌ Error registrando soporte")
 
     # =====================================================
-    # TAB 2 - HISTORIAL
+    # TAB 2 - SOPORTES PENDIENTES
     # =====================================================
 
     with tab2:
+
+        st.subheader("⏳ Soportes Pendientes")
+        st.caption(
+            "Se muestran por orden de llegada. Cada desarrollador puede "
+            "consultar sus asignaciones, iniciarlas y marcarlas como finalizadas."
+        )
+
+        if soportes_df.empty:
+            st.info("📭 No hay soportes registrados")
+
+        else:
+            soportes_pendientes = soportes_df[
+                soportes_df["estado"].apply(soporte_esta_pendiente)
+            ].copy()
+
+            soportes_pendientes["_fecha_orden"] = pd.to_datetime(
+                soportes_pendientes["fecha_ingreso"],
+                errors="coerce",
+            )
+            soportes_pendientes = soportes_pendientes.sort_values(
+                ["_fecha_orden", "id"],
+                ascending=[True, True],
+                na_position="last",
+            )
+
+            opciones_devs_pendientes = sorted(
+                soportes_pendientes["desarrollador"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+            filtro_dev_pendiente = st.selectbox(
+                "👨‍💻 Ver soportes asignados a",
+                ["Todos los desarrolladores", *opciones_devs_pendientes],
+            )
+
+            if filtro_dev_pendiente != "Todos los desarrolladores":
+                soportes_pendientes = soportes_pendientes[
+                    soportes_pendientes["desarrollador"]
+                    == filtro_dev_pendiente
+                ]
+
+            total_pendientes = int(
+                (soportes_pendientes["estado"] == "Pendiente").sum()
+            )
+            total_en_curso = int(
+                (soportes_pendientes["estado"] == "En curso").sum()
+            )
+
+            col_total, col_pendientes, col_curso = st.columns(3)
+            col_total.metric("Por atender", len(soportes_pendientes))
+            col_pendientes.metric("Pendientes", total_pendientes)
+            col_curso.metric("En curso", total_en_curso)
+
+            if soportes_pendientes.empty:
+                st.success("✅ No hay soportes pendientes para este desarrollador")
+
+            for posicion, (_, soporte) in enumerate(
+                soportes_pendientes.iterrows(),
+                start=1,
+            ):
+                titulo_soporte, soporte_es_automatizacion = (
+                    interpretar_nombre_soporte(soporte.get("desarrollo"))
+                )
+                soporte_id = int(soporte["id"])
+                estado_actual = normalizar_estado_soporte(
+                    soporte.get("estado")
+                )
+
+                with st.container(border=True):
+                    st.markdown(
+                        f"#### #{posicion} · 🛠️ {texto_seguro(titulo_soporte)}"
+                    )
+                    st.caption(
+                        "Automatización" if soporte_es_automatizacion
+                        else "Soporte independiente"
+                    )
+
+                    col_info, col_estado = st.columns([3, 1])
+
+                    with col_info:
+                        st.markdown(
+                            f"**👨‍💻 Desarrollador:** "
+                            f"{texto_seguro(soporte.get('desarrollador'))}  \n"
+                            f"**🏢 Célula:** "
+                            f"{texto_seguro(soporte.get('celula'))}  \n"
+                            f"**📅 Fecha de ingreso:** "
+                            f"{texto_seguro(soporte.get('fecha_ingreso'))}  \n"
+                            f"**🚨 Prioridad:** "
+                            f"{texto_seguro(soporte.get('prioridad'))}  \n"
+                            f"**📝 Descripción:** "
+                            f"{texto_seguro(soporte.get('descripcion'))}"
+                        )
+
+                    with col_estado:
+                        st.markdown(f"**Estado:** {estado_actual}")
+
+                        if estado_actual == "Pendiente":
+                            if st.button(
+                                "▶️ Iniciar soporte",
+                                key=f"iniciar_soporte_{soporte_id}",
+                                width="stretch",
+                            ):
+                                if actualizar_estado_soporte(
+                                    soporte_id,
+                                    "En curso",
+                                ):
+                                    st.success("Soporte puesto en curso")
+                                    st.rerun()
+
+                        if st.button(
+                            "✅ Finalizar soporte",
+                            key=f"finalizar_soporte_{soporte_id}",
+                            type="primary",
+                            width="stretch",
+                        ):
+                            if actualizar_estado_soporte(
+                                soporte_id,
+                                "Finalizado",
+                            ):
+                                st.success("Soporte finalizado")
+                                st.rerun()
+
+    # =====================================================
+    # TAB 3 - HISTORIAL
+    # =====================================================
+
+    with tab3:
 
         st.subheader("📋 Historial de Soportes")
 

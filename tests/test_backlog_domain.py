@@ -2,12 +2,16 @@ import unittest
 
 from backlog_domain import (
     CELULAS,
+    ESTADOS_SOPORTE,
     ESTADOS_TAREA,
+    es_estado_soporte_valido,
     es_estado_valido,
     guardar_nombre_soporte,
     interpretar_nombre_soporte,
     normalizar_celula,
     normalizar_estado,
+    normalizar_estado_soporte,
+    soporte_esta_pendiente,
 )
 
 
@@ -45,6 +49,19 @@ class CelulasTest(unittest.TestCase):
 
 
 class SoportesTest(unittest.TestCase):
+    def test_normaliza_estados_historicos_de_soporte(self):
+        self.assertEqual(normalizar_estado_soporte("En Proceso"), "En curso")
+        self.assertEqual(normalizar_estado_soporte("Terminado"), "Finalizado")
+
+    def test_estados_oficiales_de_soporte(self):
+        for estado in ESTADOS_SOPORTE:
+            self.assertTrue(es_estado_soporte_valido(estado))
+
+    def test_solo_finalizado_sale_de_pendientes(self):
+        self.assertTrue(soporte_esta_pendiente("Pendiente"))
+        self.assertTrue(soporte_esta_pendiente("En Proceso"))
+        self.assertFalse(soporte_esta_pendiente("Finalizado"))
+
     def test_identifica_soporte_independiente(self):
         valor = guardar_nombre_soporte("Ajuste operativo", False)
         self.assertEqual(

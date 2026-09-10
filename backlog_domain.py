@@ -11,6 +11,19 @@ ESTADOS_TAREA = (
     "Descartado",
 )
 
+ESTADOS_SOPORTE = (
+    "Pendiente",
+    "En curso",
+    "Finalizado",
+)
+
+ALIASES_ESTADO_SOPORTE = {
+    "En Proceso": "En curso",
+    "En proceso": "En curso",
+    "En Curso": "En curso",
+    "Terminado": "Finalizado",
+}
+
 ALIASES_ESTADO = {
     "En proceso": "En Proceso",
     "En proceso ": "En Proceso",
@@ -75,6 +88,22 @@ _ALIAS_CELULAS = {
 def normalizar_estado(estado):
     """Devuelve la representación canónica de un estado histórico."""
     return ALIASES_ESTADO.get(estado, estado)
+
+
+def normalizar_estado_soporte(estado):
+    """Devuelve uno de los tres estados oficiales de un soporte."""
+    estado = str(estado or "").strip()
+    return ALIASES_ESTADO_SOPORTE.get(estado, estado)
+
+
+def soporte_esta_pendiente(estado):
+    """Indica si un soporte todavía requiere atención."""
+    return normalizar_estado_soporte(estado) != "Finalizado"
+
+
+def es_estado_soporte_valido(estado):
+    """Indica si el estado pertenece al flujo de soportes."""
+    return normalizar_estado_soporte(estado) in ESTADOS_SOPORTE
 
 
 def normalizar_celula(valor):
