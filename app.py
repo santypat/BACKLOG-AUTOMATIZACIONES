@@ -2855,44 +2855,32 @@ elif menu == "🛠️ Soportes":
                     else "Soporte independiente"
                 )
 
-                st.markdown(f"""
-                <div style="
-                    background-color:#FEFFC7;
-                    padding:20px;
-                    border-radius:18px;
-                    margin-bottom:15px;
-                    border:1px solid #333;
-                    box-shadow:0px 2px 10px rgba(0,0,0,0.2);
-                ">
-
-                <h4 style="color:#00c8ff;">
-                    🛠️ {soporte_seguro['titulo']}
-                </h4>
-
-                <p><b>🔗 Origen:</b> {soporte_seguro['origen']}</p>
-
-                <p><b>👨‍💻 Desarrollador:</b> {soporte_seguro['desarrollador']}</p>
-
-                <p><b>🏢 Célula:</b> {soporte_seguro['celula']}</p>
-
-                <p><b>📌 Estado:</b> {soporte_seguro['estado']}</p>
-
-                <p><b>🛠️ Tipo:</b> {soporte_seguro['tipo_soporte']}</p>
-
-                <p><b>⏱️ Horas:</b> {soporte_seguro['horas_empleadas']}</p>
-
-                <p><b>📅 Ingreso:</b> {soporte_seguro['fecha_ingreso']}</p>
-
-                <p><b>📅 Entrega:</b> {soporte_seguro['fecha_entrega']}</p>
-
-                <p><b>📝 Descripción:</b><br>
-                {soporte_seguro['descripcion']}</p>
-
-                <p><b>📋 Observaciones:</b><br>
-                {soporte_seguro['observaciones']}</p>
-
-                </div>
-                """, unsafe_allow_html=True)
+                descripcion_html = soporte_seguro["descripcion"].replace(
+                    "\n",
+                    "<br>",
+                )
+                observaciones_html = soporte_seguro["observaciones"].replace(
+                    "\n",
+                    "<br>",
+                )
+                tarjeta_html = "".join([
+                    '<div style="background-color:#FEFFC7;padding:20px;',
+                    'border-radius:18px;margin-bottom:15px;border:1px solid #333;',
+                    'box-shadow:0px 2px 10px rgba(0,0,0,0.2);">',
+                    f'<h4 style="color:#00c8ff;">🛠️ {soporte_seguro["titulo"]}</h4>',
+                    f'<p><b>🔗 Origen:</b> {soporte_seguro["origen"]}</p>',
+                    f'<p><b>👨‍💻 Desarrollador:</b> {soporte_seguro["desarrollador"]}</p>',
+                    f'<p><b>🏢 Célula:</b> {soporte_seguro["celula"]}</p>',
+                    f'<p><b>📌 Estado:</b> {soporte_seguro["estado"]}</p>',
+                    f'<p><b>🛠️ Tipo:</b> {soporte_seguro["tipo_soporte"]}</p>',
+                    f'<p><b>⏱️ Horas:</b> {soporte_seguro["horas_empleadas"]}</p>',
+                    f'<p><b>📅 Ingreso:</b> {soporte_seguro["fecha_ingreso"]}</p>',
+                    f'<p><b>📅 Entrega:</b> {soporte_seguro["fecha_entrega"]}</p>',
+                    f'<p><b>📝 Descripción:</b><br>{descripcion_html}</p>',
+                    f'<p><b>📋 Observaciones:</b><br>{observaciones_html}</p>',
+                    '</div>',
+                ])
+                st.markdown(tarjeta_html, unsafe_allow_html=True)
 
 # -------------------------
 # NUEVA TAREA
