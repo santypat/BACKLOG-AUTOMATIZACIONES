@@ -3532,6 +3532,7 @@ elif menu == "📤 Exportar Excel":
                 "sprint",
                 "desarrolladores",
                 "fecha",
+                "fecha_estimada_entrega",
                 "fecha_inicio",
                 "fecha_fin"
 
@@ -3545,6 +3546,10 @@ elif menu == "📤 Exportar Excel":
                     df_export[col] = ""
 
             df_export = df_export[columnas_exportar]
+            df_export["fecha_estimada_entrega"] = pd.to_datetime(
+                df_export["fecha_estimada_entrega"],
+                errors="coerce",
+            )
 
             df_export.to_excel(
                 buffer_excel,
