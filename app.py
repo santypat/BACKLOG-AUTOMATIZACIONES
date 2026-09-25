@@ -15,6 +15,7 @@ from backlog_domain import (
     ESTADOS_TAREA,
     FECHA_ESTIMADA_TIPO,
     codificar_detalle_documentacion,
+    confirmacion_eliminacion_valida,
     es_estado_soporte_valido,
     guardar_nombre_soporte,
     guardar_referencia_desarrollo,
@@ -986,6 +987,81 @@ def actualizar_estado_soporte(soporte_id, estado):
     except Exception as e:
         mostrar_error_usuario("No fue posible actualizar el soporte", e)
         return False
+
+
+# =====================================================
+# ELIMINAR SOPORTE
+# =====================================================
+
+def eliminar_soporte(soporte_id):
+    """Elimina definitivamente un soporte previamente confirmado."""
+    try:
+        supabase.table("soportes_mantenimiento").delete().eq(
+            "id",
+            int(soporte_id),
+        ).execute()
+
+        invalidar_cache(obtener_soportes)
+        return True
+
+    except Exception as e:
+        mostrar_error_usuario("No fue posible eliminar el soporte", e)
+        return False
+
+
+@st.dialog("🗑️ Confirmar eliminación", width="small")
+def confirmar_eliminacion_soporte(soporte_id, titulo_soporte, nonce):
+    """Solicita la palabra de seguridad antes del borrado irreversible."""
+    st.warning(
+        "Esta acción es irreversible y eliminará el soporte del historial."
+    )
+    st.write("Soporte seleccionado:", titulo_soporte or "Sin nombre")
+
+    clave_confirmacion = f"confirmar_eliminar_{soporte_id}_{nonce}"
+    confirmacion = st.text_input(
+        'Escribe "ELIMINAR" para confirmar',
+        key=clave_confirmacion,
+        placeholder="ELIMINAR",
+    )
+    confirmacion_valida = confirmacion_eliminacion_valida(confirmacion)
+
+    if confirmacion and not confirmacion_valida:
+        st.error("Debes escribir exactamente ELIMINAR.")
+
+    col_cancelar, col_eliminar = st.columns(2)
+    with col_cancelar:
+        if st.button(
+            "Cancelar",
+            key=f"cancelar_eliminar_{soporte_id}_{nonce}",
+            width="stretch",
+        ):
+            st.rerun()
+
+    with col_eliminar:
+        if st.button(
+            "Eliminar definitivamente",
+            key=f"confirmar_borrado_{soporte_id}_{nonce}",
+            type="primary",
+            disabled=not confirmacion_valida,
+            width="stretch",
+        ):
+            if eliminar_soporte(soporte_id):
+                st.session_state["soporte_eliminado_mensaje"] = (
+                    f"Soporte #{soporte_id} eliminado correctamente."
+                )
+                st.rerun()
+
+
+def boton_eliminar_soporte(soporte_id, titulo_soporte, clave):
+    """Muestra el acceso al diálogo con una clave independiente por tarjeta."""
+    if st.button(
+        "🗑️ Eliminar soporte",
+        key=clave,
+        width="stretch",
+    ):
+        nonce = st.session_state.get("eliminar_soporte_nonce", 0) + 1
+        st.session_state["eliminar_soporte_nonce"] = nonce
+        confirmar_eliminacion_soporte(soporte_id, titulo_soporte, nonce)
 
 
 # =====================================================
@@ -2475,6 +2551,13 @@ elif menu == "🛠️ Soportes":
 
     soportes_df = obtener_soportes()
 
+    mensaje_eliminacion = st.session_state.pop(
+        "soporte_eliminado_mensaje",
+        None,
+    )
+    if mensaje_eliminacion:
+        st.success(mensaje_eliminacion)
+
     tab1, tab2, tab3 = st.tabs([
         "➕ Registrar Soporte",
         "⏳ Soportes Pendientes",
@@ -2778,6 +2861,12 @@ elif menu == "🛠️ Soportes":
                                 st.success("Soporte descartado")
                                 st.rerun()
 
+                        boton_eliminar_soporte(
+                            soporte_id,
+                            titulo_soporte,
+                            f"eliminar_pendiente_{soporte_id}",
+                        )
+
     # =====================================================
     # TAB 3 - HISTORIAL
     # =====================================================
@@ -2865,6 +2954,7 @@ elif menu == "🛠️ Soportes":
                 titulo_soporte, soporte_es_automatizacion = (
                     interpretar_nombre_soporte(soporte.get("desarrollo"))
                 )
+                soporte_id = int(soporte["id"])
                 origen = (
                     "Automatización" if soporte_es_automatizacion
                     else "Soporte independiente"
@@ -2904,6 +2994,11 @@ elif menu == "🛠️ Soportes":
                     st.markdown("**📋 Observaciones:**")
                     st.write(
                         soporte.get("observaciones") or "Sin observaciones"
+                    )
+                    boton_eliminar_soporte(
+                        soporte_id,
+                        titulo_soporte,
+                        f"eliminar_historial_{soporte_id}",
                     )
 
 # -------------------------

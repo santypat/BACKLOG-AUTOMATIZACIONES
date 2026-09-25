@@ -6,6 +6,7 @@ from backlog_domain import (
     ESTADOS_SOPORTE,
     ESTADOS_TAREA,
     codificar_detalle_documentacion,
+    confirmacion_eliminacion_valida,
     es_estado_soporte_valido,
     es_estado_valido,
     guardar_nombre_soporte,
@@ -85,6 +86,13 @@ class SoportesTest(unittest.TestCase):
             interpretar_nombre_soporte(valor),
             ("Robot de conciliación", True),
         )
+
+    def test_exige_confirmacion_exacta_para_eliminar(self):
+        self.assertTrue(confirmacion_eliminacion_valida("ELIMINAR"))
+        self.assertFalse(confirmacion_eliminacion_valida("eliminar"))
+        self.assertFalse(confirmacion_eliminacion_valida("ELIMINAR soporte"))
+        self.assertFalse(confirmacion_eliminacion_valida(" ELIMINAR "))
+        self.assertFalse(confirmacion_eliminacion_valida(""))
 
 
 class DocumentacionesTest(unittest.TestCase):

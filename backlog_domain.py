@@ -111,6 +111,11 @@ def es_estado_soporte_valido(estado):
     return normalizar_estado_soporte(estado) in ESTADOS_SOPORTE
 
 
+def confirmacion_eliminacion_valida(valor):
+    """Exige la palabra de seguridad exacta antes de eliminar un soporte."""
+    return str(valor or "") == "ELIMINAR"
+
+
 def normalizar_celula(valor):
     """Devuelve una célula oficial para valores históricos conocidos."""
     clave = _clave_texto(valor)
