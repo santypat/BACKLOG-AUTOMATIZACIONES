@@ -16,6 +16,7 @@ ESTADOS_SOPORTE = (
     "Pendiente",
     "En curso",
     "Finalizado",
+    "Descartado",
 )
 
 ALIASES_ESTADO_SOPORTE = {
@@ -95,14 +96,14 @@ def normalizar_estado(estado):
 
 
 def normalizar_estado_soporte(estado):
-    """Devuelve uno de los tres estados oficiales de un soporte."""
+    """Devuelve uno de los estados oficiales de un soporte."""
     estado = str(estado or "").strip()
     return ALIASES_ESTADO_SOPORTE.get(estado, estado)
 
 
 def soporte_esta_pendiente(estado):
     """Indica si un soporte todavía requiere atención."""
-    return normalizar_estado_soporte(estado) != "Finalizado"
+    return normalizar_estado_soporte(estado) in ("Pendiente", "En curso")
 
 
 def es_estado_soporte_valido(estado):

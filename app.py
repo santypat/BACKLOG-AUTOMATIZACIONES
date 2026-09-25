@@ -26,6 +26,7 @@ from backlog_domain import (
     normalizar_estado_soporte,
     soporte_esta_pendiente,
 )
+from support_reports import generar_reporte_soportes_excel
 
 logger = logging.getLogger(__name__)
 
@@ -2645,7 +2646,7 @@ elif menu == "🛠️ Soportes":
         st.subheader("⏳ Soportes Pendientes")
         st.caption(
             "Se muestran por orden de llegada. Cada desarrollador puede "
-            "consultar sus asignaciones, iniciarlas y marcarlas como finalizadas."
+            "consultar sus asignaciones, iniciarlas, finalizarlas o descartarlas."
         )
 
         if soportes_df.empty:
@@ -2765,6 +2766,18 @@ elif menu == "🛠️ Soportes":
                                 st.success("Soporte finalizado")
                                 st.rerun()
 
+                        if st.button(
+                            "🚫 Descartar soporte",
+                            key=f"descartar_soporte_{soporte_id}",
+                            width="stretch",
+                        ):
+                            if actualizar_estado_soporte(
+                                soporte_id,
+                                "Descartado",
+                            ):
+                                st.success("Soporte descartado")
+                                st.rerun()
+
     # =====================================================
     # TAB 3 - HISTORIAL
     # =====================================================
@@ -2780,6 +2793,25 @@ elif menu == "🛠️ Soportes":
         else:
 
             soportes_filtrados = soportes_df.copy()
+            reporte_excel = generar_reporte_soportes_excel(soportes_df)
+            st.download_button(
+                "📥 Descargar historial completo en Excel",
+                data=reporte_excel,
+                file_name=(
+                    "historial_soportes_"
+                    f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                ),
+                mime=(
+                    "application/vnd.openxmlformats-officedocument."
+                    "spreadsheetml.sheet"
+                ),
+                width="stretch",
+            )
+            st.caption(
+                "Incluye soportes pendientes, en curso, finalizados y "
+                "descartados."
+            )
+
             fechas_soporte = pd.to_datetime(
                 soportes_filtrados["fecha_ingreso"],
                 errors="coerce",
@@ -2833,54 +2865,46 @@ elif menu == "🛠️ Soportes":
                 titulo_soporte, soporte_es_automatizacion = (
                     interpretar_nombre_soporte(soporte.get("desarrollo"))
                 )
-
-                soporte_seguro = {
-                    campo: texto_seguro(soporte.get(campo))
-                    for campo in [
-                        "desarrollo",
-                        "desarrollador",
-                        "celula",
-                        "estado",
-                        "tipo_soporte",
-                        "horas_empleadas",
-                        "fecha_ingreso",
-                        "fecha_entrega",
-                        "descripcion",
-                        "observaciones",
-                    ]
-                }
-                soporte_seguro["titulo"] = texto_seguro(titulo_soporte)
-                soporte_seguro["origen"] = (
+                origen = (
                     "Automatización" if soporte_es_automatizacion
                     else "Soporte independiente"
                 )
 
-                descripcion_html = soporte_seguro["descripcion"].replace(
-                    "\n",
-                    "<br>",
-                )
-                observaciones_html = soporte_seguro["observaciones"].replace(
-                    "\n",
-                    "<br>",
-                )
-                tarjeta_html = "".join([
-                    '<div style="background-color:#FEFFC7;padding:20px;',
-                    'border-radius:18px;margin-bottom:15px;border:1px solid #333;',
-                    'box-shadow:0px 2px 10px rgba(0,0,0,0.2);">',
-                    f'<h4 style="color:#00c8ff;">🛠️ {soporte_seguro["titulo"]}</h4>',
-                    f'<p><b>🔗 Origen:</b> {soporte_seguro["origen"]}</p>',
-                    f'<p><b>👨‍💻 Desarrollador:</b> {soporte_seguro["desarrollador"]}</p>',
-                    f'<p><b>🏢 Célula:</b> {soporte_seguro["celula"]}</p>',
-                    f'<p><b>📌 Estado:</b> {soporte_seguro["estado"]}</p>',
-                    f'<p><b>🛠️ Tipo:</b> {soporte_seguro["tipo_soporte"]}</p>',
-                    f'<p><b>⏱️ Horas:</b> {soporte_seguro["horas_empleadas"]}</p>',
-                    f'<p><b>📅 Ingreso:</b> {soporte_seguro["fecha_ingreso"]}</p>',
-                    f'<p><b>📅 Entrega:</b> {soporte_seguro["fecha_entrega"]}</p>',
-                    f'<p><b>📝 Descripción:</b><br>{descripcion_html}</p>',
-                    f'<p><b>📋 Observaciones:</b><br>{observaciones_html}</p>',
-                    '</div>',
-                ])
-                st.markdown(tarjeta_html, unsafe_allow_html=True)
+                with st.container(border=True):
+                    st.markdown(
+                        f"#### 🛠️ {texto_seguro(titulo_soporte)}"
+                    )
+
+                    col_datos, col_fechas = st.columns(2)
+                    with col_datos:
+                        st.markdown(
+                            f"**🔗 Origen:** {origen}  \n"
+                            f"**👨‍💻 Desarrollador:** "
+                            f"{texto_seguro(soporte.get('desarrollador'))}  \n"
+                            f"**🏢 Célula:** "
+                            f"{texto_seguro(soporte.get('celula'))}  \n"
+                            f"**📌 Estado:** "
+                            f"{texto_seguro(soporte.get('estado'))}"
+                        )
+
+                    with col_fechas:
+                        st.markdown(
+                            f"**🛠️ Tipo:** "
+                            f"{texto_seguro(soporte.get('tipo_soporte'))}  \n"
+                            f"**⏱️ Horas:** "
+                            f"{texto_seguro(soporte.get('horas_empleadas'))}  \n"
+                            f"**📅 Ingreso:** "
+                            f"{texto_seguro(soporte.get('fecha_ingreso'))}  \n"
+                            f"**📅 Entrega:** "
+                            f"{texto_seguro(soporte.get('fecha_entrega'))}"
+                        )
+
+                    st.markdown("**📝 Descripción:**")
+                    st.write(soporte.get("descripcion") or "Sin descripción")
+                    st.markdown("**📋 Observaciones:**")
+                    st.write(
+                        soporte.get("observaciones") or "Sin observaciones"
+                    )
 
 # -------------------------
 # NUEVA TAREA

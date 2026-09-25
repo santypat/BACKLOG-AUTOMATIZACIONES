@@ -62,10 +62,15 @@ class SoportesTest(unittest.TestCase):
         for estado in ESTADOS_SOPORTE:
             self.assertTrue(es_estado_soporte_valido(estado))
 
-    def test_solo_finalizado_sale_de_pendientes(self):
+    def test_estados_cerrados_salen_de_pendientes(self):
         self.assertTrue(soporte_esta_pendiente("Pendiente"))
         self.assertTrue(soporte_esta_pendiente("En Proceso"))
         self.assertFalse(soporte_esta_pendiente("Finalizado"))
+        self.assertFalse(soporte_esta_pendiente("Descartado"))
+
+    def test_descartado_es_un_estado_oficial(self):
+        self.assertIn("Descartado", ESTADOS_SOPORTE)
+        self.assertTrue(es_estado_soporte_valido("Descartado"))
 
     def test_identifica_soporte_independiente(self):
         valor = guardar_nombre_soporte("Ajuste operativo", False)
