@@ -27,7 +27,10 @@ from backlog_domain import (
     normalizar_estado_soporte,
     soporte_esta_pendiente,
 )
-from support_reports import generar_reporte_soportes_excel
+from support_reports import (
+    generar_reporte_backlog_excel,
+    generar_reporte_soportes_excel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -3607,7 +3610,6 @@ elif menu == "📤 Exportar Excel":
         
         with col_exp2:
             # Exportar a Excel
-            buffer_excel = io.BytesIO()
             columnas_exportar = [
 
                 "id",
@@ -3646,19 +3648,19 @@ elif menu == "📤 Exportar Excel":
                 errors="coerce",
             )
 
-            df_export.to_excel(
-                buffer_excel,
-                index=False,
-                sheet_name='Backlog'
+            reporte_excel = generar_reporte_backlog_excel(
+                df_export,
+                obtener_soportes(),
             )
             
             st.download_button(
                 label="📥 Descargar Excel",
-                data=buffer_excel.getvalue(),
+                data=reporte_excel,
                 file_name=f"backlog_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 width="stretch"
             )
+            st.caption("Incluye las hojas Backlog y SOPORTES.")
         
         with col_exp3:
             # Exportar a CSV

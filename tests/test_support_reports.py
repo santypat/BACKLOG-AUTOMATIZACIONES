@@ -6,6 +6,7 @@ from openpyxl import load_workbook
 
 from support_reports import (
     REPORT_COLUMNS,
+    generar_reporte_backlog_excel,
     generar_reporte_soportes_excel,
     preparar_historial_soportes,
 )
@@ -63,6 +64,32 @@ class ReporteSoportesTest(unittest.TestCase):
         self.assertEqual(hoja["F3"].value, "Descartado")
         self.assertEqual(hoja["J2"].number_format, "dd/mm/yyyy")
         self.assertEqual(hoja["M2"].data_type, "s")
+
+    def test_exportacion_general_incluye_backlog_y_soportes(self):
+        backlog = pd.DataFrame([
+            {
+                "id": 1,
+                "nombre": "Automatización de novedades",
+                "estado": "Terminado",
+                "fecha_estimada_entrega": "2026-10-15",
+            },
+        ])
+
+        contenido = generar_reporte_backlog_excel(backlog, self.soportes)
+        libro = load_workbook(io.BytesIO(contenido), data_only=False)
+
+        self.assertEqual(libro.sheetnames, ["Backlog", "SOPORTES"])
+        self.assertEqual(libro["Backlog"]["A2"].value, 1)
+        self.assertEqual(
+            libro["Backlog"]["D2"].number_format,
+            "dd/mm/yyyy",
+        )
+        self.assertEqual(libro["SOPORTES"].max_row, 3)
+        self.assertEqual(libro["SOPORTES"]["F3"].value, "Descartado")
+        self.assertEqual(
+            libro["SOPORTES"]["J2"].number_format,
+            "dd/mm/yyyy",
+        )
 
 
 if __name__ == "__main__":
