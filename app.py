@@ -10,15 +10,20 @@ import re
 import plotly.express as px
 
 from backlog_domain import (
+    AVANCE_TAREA_TIPO,
     CELULAS,
     DOCUMENTACION_TIPO,
+    ETAPAS_AVANCE,
     ESTADOS_TAREA,
     FECHA_ESTIMADA_TIPO,
+    calcular_porcentaje_avance,
+    codificar_avance_tarea,
     codificar_detalle_documentacion,
     confirmacion_eliminacion_valida,
     es_estado_soporte_valido,
     guardar_nombre_soporte,
     guardar_referencia_desarrollo,
+    interpretar_avance_tarea,
     interpretar_detalle_documentacion,
     interpretar_nombre_soporte,
     interpretar_referencia_desarrollo,
@@ -409,6 +414,15 @@ def obtener_tareas():
 
         fechas_estimadas = obtener_fechas_estimadas()
         df["fecha_estimada_entrega"] = df["id"].map(fechas_estimadas)
+
+        avances_tareas = obtener_avances_tareas()
+        df["avance_porcentaje"] = [
+            calcular_porcentaje_avance(
+                avances_tareas.get(int(tarea_id), ()),
+                estado,
+            )
+            for tarea_id, estado in zip(df["id"], df["estado"])
+        ]
 
      
         # Ordenar por prioridad (URGENTE → MEDIA → BAJA) y luego por ID
@@ -904,7 +918,11 @@ def obtener_soportes():
             if "tipo_soporte" in df.columns:
                 df = df[
                     ~df["tipo_soporte"].isin(
-                        [DOCUMENTACION_TIPO, FECHA_ESTIMADA_TIPO]
+                        [
+                            DOCUMENTACION_TIPO,
+                            FECHA_ESTIMADA_TIPO,
+                            AVANCE_TAREA_TIPO,
+                        ]
                     )
                 ].copy()
             if "celula" in df.columns:
@@ -996,13 +1014,20 @@ def actualizar_estado_soporte(soporte_id, estado):
 # ELIMINAR SOPORTE
 # =====================================================
 
-def eliminar_soporte(soporte_id):
+def eliminar_soporte(soporte_id, confirmacion):
     """Elimina definitivamente un soporte previamente confirmado."""
     try:
-        supabase.table("soportes_mantenimiento").delete().eq(
-            "id",
-            int(soporte_id),
+        resultado = supabase.rpc(
+            "eliminar_soporte_confirmado",
+            {
+                "p_soporte_id": int(soporte_id),
+                "p_confirmacion": confirmacion,
+            },
         ).execute()
+
+        if resultado.data is False:
+            st.error("El soporte ya no existe o fue eliminado previamente.")
+            return False
 
         invalidar_cache(obtener_soportes)
         return True
@@ -1048,7 +1073,7 @@ def confirmar_eliminacion_soporte(soporte_id, titulo_soporte, nonce):
             disabled=not confirmacion_valida,
             width="stretch",
         ):
-            if eliminar_soporte(soporte_id):
+            if eliminar_soporte(soporte_id, confirmacion):
                 st.session_state["soporte_eliminado_mensaje"] = (
                     f"Soporte #{soporte_id} eliminado correctamente."
                 )
@@ -1218,6 +1243,149 @@ def crear_documentacion(
     except Exception as e:
         mostrar_error_usuario("No fue posible guardar la documentación", e)
         return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def obtener_avances_tareas():
+    """Retorna las etapas de avance registradas por ID de desarrollo."""
+    try:
+        response = supabase.table("soportes_mantenimiento").select(
+            "desarrollo, observaciones"
+        ).eq("tipo_soporte", AVANCE_TAREA_TIPO).execute()
+
+        avances = {}
+        for registro in response.data or []:
+            desarrollo_id = interpretar_referencia_desarrollo(
+                registro.get("desarrollo")
+            )
+            if desarrollo_id is not None:
+                avances[desarrollo_id] = interpretar_avance_tarea(
+                    registro.get("observaciones")
+                )
+        return avances
+
+    except Exception as e:
+        logger.exception("No fue posible cargar avances de tareas: %s", e)
+        return {}
+
+
+def guardar_avance_tarea(tarea, etapas):
+    """Crea o actualiza el único metadato de avance de una tarea."""
+    desarrollo_id = int(tarea["id"])
+    referencia = guardar_referencia_desarrollo(desarrollo_id)
+    porcentaje = calcular_porcentaje_avance(etapas, tarea.get("estado", ""))
+    responsable = str(tarea.get("desarrolladores") or "Sin asignar").split(",")[0]
+    datos = _datos_registro_documental(
+        AVANCE_TAREA_TIPO,
+        desarrollo_id,
+        tarea.get("celula", ""),
+        responsable.strip(),
+        f"{porcentaje}% de avance",
+        codificar_avance_tarea(etapas),
+    )
+
+    try:
+        existente = supabase.table("soportes_mantenimiento").select(
+            "id"
+        ).eq("tipo_soporte", AVANCE_TAREA_TIPO).eq(
+            "desarrollo", referencia
+        ).limit(1).execute()
+
+        if existente.data:
+            supabase.table("soportes_mantenimiento").update(datos).eq(
+                "id", existente.data[0]["id"]
+            ).execute()
+        else:
+            supabase.table("soportes_mantenimiento").insert(datos).execute()
+
+        invalidar_cache(obtener_avances_tareas, obtener_tareas)
+        return True
+
+    except Exception as e:
+        mostrar_error_usuario("No fue posible guardar el avance", e)
+        return False
+
+
+def eliminar_tarea(tarea_id, confirmacion):
+    """Elimina una tarea y sus relaciones mediante la función segura."""
+    try:
+        resultado = supabase.rpc(
+            "eliminar_tarea_confirmada",
+            {
+                "p_tarea_id": int(tarea_id),
+                "p_confirmacion": confirmacion,
+            },
+        ).execute()
+
+        if resultado.data is False:
+            st.error("La tarea ya no existe o fue eliminada previamente.")
+            return False
+
+        invalidar_cache(
+            obtener_tareas,
+            obtener_avances_tareas,
+            obtener_fechas_estimadas,
+            obtener_documentaciones,
+            obtener_soportes,
+        )
+        return True
+
+    except Exception as e:
+        mostrar_error_usuario("No fue posible eliminar la tarea", e)
+        return False
+
+
+@st.dialog("🗑️ Confirmar eliminación de tarea", width="small")
+def confirmar_eliminacion_tarea(tarea_id, nombre_tarea, nonce):
+    """Exige la palabra de seguridad antes de borrar una tarea."""
+    st.warning(
+        "Esta acción es irreversible. Se eliminarán la tarea, sus "
+        "asignaciones y sus metadatos de avance, fecha y documentación."
+    )
+    st.write("Tarea seleccionada:", nombre_tarea or "Sin nombre")
+
+    clave = f"confirmar_eliminar_tarea_{tarea_id}_{nonce}"
+    confirmacion = st.text_input(
+        'Escribe "ELIMINAR" para confirmar',
+        key=clave,
+        placeholder="ELIMINAR",
+    )
+    confirmacion_valida = confirmacion_eliminacion_valida(confirmacion)
+
+    if confirmacion and not confirmacion_valida:
+        st.error("Debes escribir exactamente ELIMINAR.")
+
+    col_cancelar, col_eliminar = st.columns(2)
+    with col_cancelar:
+        if st.button(
+            "Cancelar",
+            key=f"cancelar_eliminar_tarea_{tarea_id}_{nonce}",
+            width="stretch",
+        ):
+            st.rerun()
+
+    with col_eliminar:
+        if st.button(
+            "Eliminar definitivamente",
+            key=f"confirmar_borrado_tarea_{tarea_id}_{nonce}",
+            type="primary",
+            disabled=not confirmacion_valida,
+            width="stretch",
+        ):
+            if eliminar_tarea(tarea_id, confirmacion):
+                st.session_state["tarea_eliminada_mensaje"] = (
+                    f"Tarea #{tarea_id} eliminada correctamente."
+                )
+                st.rerun()
+
+
+def boton_eliminar_tarea(tarea_id, nombre_tarea):
+    """Abre el diálogo de confirmación para la tarea seleccionada."""
+    if st.button("🗑️ Eliminar tarea", type="primary", width="stretch"):
+        nonce = st.session_state.get("eliminar_tarea_nonce", 0) + 1
+        st.session_state["eliminar_tarea_nonce"] = nonce
+        confirmar_eliminacion_tarea(tarea_id, nombre_tarea, nonce)
+
 # -------------------------
 # SIDEBAR
 # -------------------------
@@ -1655,6 +1823,13 @@ elif menu == "📝 Gestión de Tareas":
 
     df = obtener_tareas()
 
+    mensaje_eliminacion_tarea = st.session_state.pop(
+        "tarea_eliminada_mensaje",
+        None,
+    )
+    if mensaje_eliminacion_tarea:
+        st.success(mensaje_eliminacion_tarea)
+
     if df.empty:
 
         st.info("📭 No hay tareas registradas.")
@@ -1829,6 +2004,7 @@ elif menu == "📝 Gestión de Tareas":
             'nombre',
             'desarrolladores',
             'estado',
+            'avance_porcentaje',
             'sprint',
             'horas_mes',
             'horas_optimizadas',
@@ -1842,6 +2018,11 @@ elif menu == "📝 Gestión de Tareas":
 
         ]].copy()
 
+        df_display['avance_porcentaje'] = (
+            df_display['avance_porcentaje'].fillna(0).astype(int).astype(str)
+            + "%"
+        )
+
         df_display.columns = [
 
             'ID',
@@ -1849,6 +2030,7 @@ elif menu == "📝 Gestión de Tareas":
             'Nombre',
             'Equipo',
             'Estado',
+            'Avance',
             'Sprint',
             'Horas/Mes',
             'Horas Opt.',
@@ -1882,13 +2064,15 @@ elif menu == "📝 Gestión de Tareas":
             for _, fila in df.iterrows()
         }
 
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 
             "🔄 Cambiar Estado",
             "👥 Reasignar Equipo",
             "🚦 Reasignar Prioridad",
+            "📈 Marcar Avances",
             "✅ Finalizar Tarea",
-            "✏️ Editar Tarea"
+            "✏️ Editar Tarea",
+            "🗑️ Eliminar Tarea",
 
         ])
 
@@ -2076,10 +2260,73 @@ elif menu == "📝 Gestión de Tareas":
                         st.error("❌ ID no encontrado")
 
         # =========================================================
-        # TAB 4: FINALIZAR TAREA
+        # TAB 4: MARCAR AVANCES
         # =========================================================
 
         with tab4:
+
+            tarea_avance = st.selectbox(
+                "Automatización",
+                list(opciones_accion),
+                key="tarea_avance",
+            )
+            id_avance = opciones_accion[tarea_avance]
+            tarea_avance_df = df[df["id"] == id_avance]
+
+            if not tarea_avance_df.empty:
+                tarea_avance_actual = tarea_avance_df.iloc[0]
+                esta_terminada = (
+                    normalizar_estado(tarea_avance_actual.get("estado"))
+                    == "Terminado"
+                )
+                etapas_guardadas = set(
+                    obtener_avances_tareas().get(id_avance, ())
+                )
+
+                st.caption(
+                    "Cada etapa representa 20% del avance total de la tarea."
+                )
+
+                etapas_marcadas = []
+                for indice, etapa in enumerate(ETAPAS_AVANCE):
+                    marcada = st.checkbox(
+                        etapa,
+                        value=esta_terminada or etapa in etapas_guardadas,
+                        disabled=esta_terminada,
+                        key=f"etapa_avance_{id_avance}_{indice}",
+                    )
+                    if marcada:
+                        etapas_marcadas.append(etapa)
+
+                porcentaje_avance = calcular_porcentaje_avance(
+                    etapas_marcadas,
+                    tarea_avance_actual.get("estado", ""),
+                )
+                st.progress(porcentaje_avance / 100)
+                st.metric("Porcentaje de avance", f"{porcentaje_avance}%")
+
+                if esta_terminada:
+                    st.info(
+                        "La tarea está finalizada y se muestra automáticamente "
+                        "con 100% de avance."
+                    )
+                elif st.button(
+                    "💾 Guardar avance",
+                    type="primary",
+                    width="stretch",
+                ):
+                    if guardar_avance_tarea(
+                        tarea_avance_actual.to_dict(),
+                        etapas_marcadas,
+                    ):
+                        st.success("✅ Avance actualizado correctamente")
+                        st.rerun()
+
+        # =========================================================
+        # TAB 5: FINALIZAR TAREA
+        # =========================================================
+
+        with tab5:
 
             st.markdown(
                 "**Complete los datos de finalización:**"
@@ -2204,10 +2451,10 @@ elif menu == "📝 Gestión de Tareas":
                         st.error("❌ ID no encontrado")
 
         # =========================================================
-        # TAB 5: EDITAR TAREA
+        # TAB 6: EDITAR TAREA
         # =========================================================
 
-        with tab5:
+        with tab6:
 
             st.subheader("✏️ Editar Desarrollo")
 
@@ -2540,6 +2787,34 @@ elif menu == "📝 Gestión de Tareas":
                     "Introduce un ID válido "
                     "para editar la tarea"
                 )
+
+        # =========================================================
+        # TAB 7: ELIMINAR TAREA
+        # =========================================================
+
+        with tab7:
+            st.subheader("🗑️ Eliminar Tarea")
+            tarea_eliminar = st.selectbox(
+                "Automatización a eliminar",
+                list(opciones_accion),
+                key="tarea_eliminar",
+            )
+            id_tarea_eliminar = opciones_accion[tarea_eliminar]
+            fila_tarea_eliminar = df[df["id"] == id_tarea_eliminar]
+            nombre_tarea_eliminar = (
+                str(fila_tarea_eliminar.iloc[0].get("nombre") or "")
+                if not fila_tarea_eliminar.empty
+                else ""
+            )
+
+            st.warning(
+                "La eliminación es definitiva. Antes de ejecutarla se te "
+                "pedirá escribir exactamente ELIMINAR."
+            )
+            boton_eliminar_tarea(
+                id_tarea_eliminar,
+                nombre_tarea_eliminar,
+            )
 
 # -------------------------
 # SOPORTES / MANTENIMIENTOS
@@ -3618,6 +3893,7 @@ elif menu == "📤 Exportar Excel":
                 "descripcion_desarrollo",
                 "descripcion",
                 "estado",
+                "avance_porcentaje",
                 "celula",
                 "horas_mes",
                 "horas_optimizadas",

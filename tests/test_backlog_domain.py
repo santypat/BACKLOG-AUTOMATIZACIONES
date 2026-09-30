@@ -1,10 +1,14 @@
 import unittest
 
 from backlog_domain import (
+    AVANCE_TAREA_TIPO,
     CELULAS,
     DOCUMENTACION_TIPO,
+    ETAPAS_AVANCE,
     ESTADOS_SOPORTE,
     ESTADOS_TAREA,
+    calcular_porcentaje_avance,
+    codificar_avance_tarea,
     codificar_detalle_documentacion,
     confirmacion_eliminacion_valida,
     es_estado_soporte_valido,
@@ -12,6 +16,7 @@ from backlog_domain import (
     guardar_nombre_soporte,
     guardar_referencia_desarrollo,
     interpretar_detalle_documentacion,
+    interpretar_avance_tarea,
     interpretar_nombre_soporte,
     interpretar_referencia_desarrollo,
     normalizar_celula,
@@ -115,6 +120,30 @@ class DocumentacionesTest(unittest.TestCase):
         self.assertEqual(DOCUMENTACION_TIPO, "__DOCUMENTACION__")
 
 
+class AvanceTareaTest(unittest.TestCase):
+    def test_suma_veinte_por_cada_etapa(self):
+        self.assertEqual(calcular_porcentaje_avance([], "Backlog"), 0)
+        self.assertEqual(
+            calcular_porcentaje_avance(ETAPAS_AVANCE[:3], "En Proceso"),
+            60,
+        )
+        self.assertEqual(calcular_porcentaje_avance(ETAPAS_AVANCE), 100)
+
+    def test_terminada_siempre_muestra_cien(self):
+        self.assertEqual(calcular_porcentaje_avance([], "Terminado"), 100)
+
+    def test_ignora_duplicados_y_etapas_desconocidas(self):
+        etapas = [ETAPAS_AVANCE[0], ETAPAS_AVANCE[0], "Etapa inventada"]
+        self.assertEqual(calcular_porcentaje_avance(etapas), 20)
+
+    def test_serializa_y_recupera_el_avance(self):
+        etapas = (ETAPAS_AVANCE[1], ETAPAS_AVANCE[3])
+        self.assertEqual(
+            interpretar_avance_tarea(codificar_avance_tarea(etapas)),
+            etapas,
+        )
+        self.assertEqual(AVANCE_TAREA_TIPO, "__AVANCE_TAREA__")
+
+
 if __name__ == "__main__":
     unittest.main()
-    codificar_detalle_documentacion,

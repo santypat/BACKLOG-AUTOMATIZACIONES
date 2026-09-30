@@ -48,7 +48,16 @@ CELULAS = (
 SOPORTE_INDEPENDIENTE_PREFIJO = "__SOPORTE_INDEPENDIENTE__:"
 DOCUMENTACION_TIPO = "__DOCUMENTACION__"
 FECHA_ESTIMADA_TIPO = "__FECHA_ESTIMADA__"
+AVANCE_TAREA_TIPO = "__AVANCE_TAREA__"
 REFERENCIA_DESARROLLO_PREFIJO = "__DESARROLLO_ID__:"
+
+ETAPAS_AVANCE = (
+    "Levantamiento y entendimiento del desarrollo",
+    "Desarrollo del proceso",
+    "Ejecución de pruebas",
+    "Documentación",
+    "Entrega",
+)
 
 
 def _clave_texto(valor):
@@ -112,8 +121,41 @@ def es_estado_soporte_valido(estado):
 
 
 def confirmacion_eliminacion_valida(valor):
-    """Exige la palabra de seguridad exacta antes de eliminar un soporte."""
+    """Exige la palabra de seguridad exacta antes de eliminar un registro."""
     return str(valor or "") == "ELIMINAR"
+
+
+def normalizar_etapas_avance(etapas):
+    """Conserva únicamente etapas oficiales, sin duplicados y en su orden."""
+    seleccionadas = {str(etapa or "").strip() for etapa in (etapas or [])}
+    return tuple(etapa for etapa in ETAPAS_AVANCE if etapa in seleccionadas)
+
+
+def calcular_porcentaje_avance(etapas, estado=""):
+    """Calcula 20 % por etapa; una tarea terminada siempre representa 100 %."""
+    if normalizar_estado(estado) == "Terminado":
+        return 100
+    return len(normalizar_etapas_avance(etapas)) * 20
+
+
+def codificar_avance_tarea(etapas):
+    """Serializa las etapas seleccionadas para almacenarlas como metadato."""
+    return json.dumps(
+        {"etapas": list(normalizar_etapas_avance(etapas))},
+        ensure_ascii=False,
+    )
+
+
+def interpretar_avance_tarea(valor):
+    """Lee el metadato de avance y devuelve solo etapas oficiales."""
+    try:
+        detalle = json.loads(str(valor or ""))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return ()
+
+    if not isinstance(detalle, dict):
+        return ()
+    return normalizar_etapas_avance(detalle.get("etapas"))
 
 
 def normalizar_celula(valor):
